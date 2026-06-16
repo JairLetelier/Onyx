@@ -619,10 +619,83 @@
   .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
 
   ::-webkit-scrollbar{ width:0; height:0; }
+
+  /* ---------- CONEXIÓN / CARGA ---------- */
+  .conn-banner{
+    background: var(--rojo-suave);
+    border-bottom: 1px solid rgba(192,57,43,0.3);
+    color: #E08B7D;
+    font-size: 12px;
+    padding: 9px 18px;
+    display:none;
+    align-items:center;
+    gap: 8px;
+  }
+  .conn-banner.show{ display:flex; }
+  .conn-banner button{
+    margin-left:auto;
+    background: transparent;
+    border: 1px solid rgba(192,57,43,0.4);
+    color: #E08B7D;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor:pointer;
+  }
+
+  .loading-screen{
+    position: fixed;
+    inset:0;
+    background: var(--negro);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap: 16px;
+    z-index: 100;
+  }
+  .loading-screen .spinner-star{
+    width: 36px;
+    height: 36px;
+    animation: spin 1.4s linear infinite;
+  }
+  .loading-screen p{
+    font-size: 12.5px;
+    color: var(--plata-tenue);
+    letter-spacing: 0.04em;
+  }
+  @keyframes spin{ from{ transform: rotate(0deg); } to{ transform: rotate(360deg); } }
+
+  .btn-guardar:disabled, .btn-entrega:disabled{
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .sync-dot{
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--verde);
+    display:inline-block;
+    margin-left: 6px;
+  }
+  .sync-dot.off{ background: var(--rojo); }
 </style>
 </head>
 <body>
+<div class="loading-screen" id="loadingScreen">
+  <svg class="spinner-star" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 5 C52 35 55 45 95 50 C55 55 52 65 50 95 C48 65 45 55 5 50 C45 45 48 35 50 5 Z" fill="#E8E8E8"/>
+  </svg>
+  <p>Conectando con Google Sheets...</p>
+</div>
+
 <div class="app">
+
+  <div class="conn-banner" id="connBanner">
+    <span>⚠ Sin conexión con la planilla. Los cambios no se están guardando.</span>
+    <button id="btnReintentar">Reintentar</button>
+  </div>
 
   <header>
     <svg class="logo-star" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -689,11 +762,11 @@
 
 <script>
 (function(){
-  const STORAGE_KEY = 'onyx_pedidos';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwTmvaFzQH2Y6259TsSAwqNqHGyGmMyA459-eKkRinIbAKOqM7UOEQVH2IwuVId-nZ0bA/exec';
   let pedidos = [];
   let currentTab = 'taller';
-  let nextId = 1;
   let historialMonthOffset = 0; // 0 = mes actual, -1 = mes anterior, etc.
+  let isOnline = true;
 
   const main = document.getElementById('main');
   const sheetOverlay = document.getElementById('sheetOverlay');
@@ -705,6 +778,9 @@
   const porPagarPreviewAmt = document.getElementById('porPagarPreviewAmt');
   const errorMsg = document.getElementById('errorMsg');
   const toast = document.getElementById('toast');
+  const loadingScreen = document.getElementById('loadingScreen');
+  const connBanner = document.getElementById('connBanner');
+  const btnGuardar = document.getElementById('btnGuardar');
 
   const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
@@ -720,28 +796,68 @@
     setTimeout(()=> toast.classList.remove('show'), 1800);
   }
 
-  async function loadPedidos(){
-    try{
-      const res = await window.storage.get(STORAGE_KEY, false);
-      if(res && res.value){
-        const data = JSON.parse(res.value);
-        pedidos = data.pedidos || [];
-        nextId = data.nextId || 1;
-      }
-    }catch(e){
-      pedidos = [];
-      nextId = 1;
-    }
-    render();
+  function setOnlineStatus(online){
+    isOnline = online;
+    connBanner.classList.toggle('show', !online);
   }
 
-  async function savePedidos(){
+  // ---------- API: leer pedidos ----------
+  async function fetchPedidos(){
+    const res = await fetch(API_URL, { method: 'GET' });
+    if(!res.ok) throw new Error('GET falló: ' + res.status);
+    const data = await res.json();
+    return data.pedidos || [];
+  }
+
+  // ---------- API: crear pedido ----------
+  async function apiCrearPedido(pedido){
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'create', pedido })
+    });
+    if(!res.ok) throw new Error('POST create falló: ' + res.status);
+    return res.json();
+  }
+
+  // ---------- API: actualizar estado ----------
+  async function apiActualizarEstado(id, estado){
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'updateEstado', id, estado })
+    });
+    if(!res.ok) throw new Error('POST updateEstado falló: ' + res.status);
+    return res.json();
+  }
+
+  // ---------- API: eliminar pedido ----------
+  async function apiEliminarPedido(id){
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'delete', id })
+    });
+    if(!res.ok) throw new Error('POST delete falló: ' + res.status);
+    return res.json();
+  }
+
+  async function cargarPedidosDesdeSheet(mostrarLoadingScreen){
     try{
-      await window.storage.set(STORAGE_KEY, JSON.stringify({pedidos, nextId}), false);
+      pedidos = await fetchPedidos();
+      setOnlineStatus(true);
+      if(mostrarLoadingScreen) loadingScreen.style.display = 'none';
+      render();
     }catch(e){
-      showToast('No se pudo guardar. Intenta de nuevo.');
+      setOnlineStatus(false);
+      if(mostrarLoadingScreen) loadingScreen.style.display = 'none';
+      render();
     }
   }
+
+  document.getElementById('btnReintentar').addEventListener('click', ()=>{
+    cargarPedidosDesdeSheet(false);
+  });
 
   function parseTexto(texto){
     const campos = { cliente:'', direccion:'', color:'', talla:'' };
@@ -825,7 +941,6 @@
     const abonadoFinal = isNaN(abonado) ? 0 : abonado;
 
     const pedido = {
-      id: nextId,
       fecha: new Date().toISOString(),
       cliente: campos.cliente,
       direccion: campos.direccion,
@@ -837,12 +952,22 @@
       estado: 'Pendiente'
     };
 
-    pedidos.unshift(pedido);
-    nextId += 1;
-    await savePedidos();
-    cerrarSheet();
-    showToast('Pedido guardado ✓');
-    render();
+    btnGuardar.disabled = true;
+    btnGuardar.textContent = 'Guardando...';
+    try{
+      await apiCrearPedido(pedido);
+      setOnlineStatus(true);
+      cerrarSheet();
+      showToast('Pedido guardado en Sheets ✓');
+      await cargarPedidosDesdeSheet(false);
+    }catch(e){
+      setOnlineStatus(false);
+      errorMsg.textContent = 'No se pudo guardar en la planilla. Revisa tu conexión e intenta de nuevo.';
+      errorMsg.classList.add('show');
+    }finally{
+      btnGuardar.disabled = false;
+      btnGuardar.textContent = 'Procesar y guardar';
+    }
   });
 
   document.querySelectorAll('.tab').forEach(tab=>{
@@ -863,18 +988,35 @@
 
   async function marcarEntregado(id){
     const p = pedidos.find(x=>x.id === id);
-    if(p){
-      p.estado = 'Entregado';
-      await savePedidos();
+    if(!p) return;
+    p.estado = 'Entregado';
+    render(); // optimista
+    try{
+      await apiActualizarEstado(id, 'Entregado');
+      setOnlineStatus(true);
       showToast('Pedido marcado como entregado');
+      await cargarPedidosDesdeSheet(false);
+    }catch(e){
+      setOnlineStatus(false);
+      p.estado = 'Pendiente'; // revertir
+      showToast('No se pudo actualizar. Reintenta.');
       render();
     }
   }
 
   async function eliminarPedido(id){
+    const respaldo = pedidos;
     pedidos = pedidos.filter(x=>x.id !== id);
-    await savePedidos();
-    render();
+    render(); // optimista
+    try{
+      await apiEliminarPedido(id);
+      setOnlineStatus(true);
+    }catch(e){
+      setOnlineStatus(false);
+      pedidos = respaldo; // revertir
+      showToast('No se pudo eliminar. Reintenta.');
+      render();
+    }
   }
 
   function getMonthKey(date){
@@ -1108,7 +1250,7 @@
   window.appMarcarEntregado = marcarEntregado;
   window.appEliminarPedido = eliminarPedido;
 
-  loadPedidos();
+  cargarPedidosDesdeSheet(true);
 })();
 </script>
 </body>
