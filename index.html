@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Onyx Label · Pedidos</title>
+<style>
+  :root{
+    --negro: #0A0A0A;
+    --negro-2: #141414;
+    --negro-3: #1C1C1C;
+    --plata: #E8E8E8;
+    --plata-suave: #9C9C9C;
+    --plata-tenue: #5A5A5A;
+    --linea: #2A2A2A;
+    --rojo: #C0392B;
+    --rojo-suave: rgba(192,57,43,0.14);
+    --verde: #4A9B6E;
+    --verde-suave: rgba(74,155,110,0.14);
+    --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'Courier New', ui-monospace, monospace;
+  }
+
+  @font-face{
+    font-family:'Cormorant Garamond';
+    src: local('Cormorant Garamond');
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ margin:0; padding:0; }
+
+  body{
+    background: var(--negro);
+    color: var(--plata);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .app{
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+    min-height: 100vh;
+    display:flex;
+    flex-direction:column;
+    position: relative;
+    background:
+      radial-gradient(ellipse 600px 300px at 50% -10%, rgba(255,255,255,0.05), transparent 70%),
+      var(--negro);
+  }
+
+  /* ---------- HEADER ---------- */
+  header{
+    padding: 22px 20px 16px;
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    border-bottom: 1px solid var(--linea);
+  }
+  header .logo-star{
+    width: 22px;
+    height: 22px;
+    flex-shrink:0;
+    opacity: 0.95;
+  }
+  header .brand-text{
+    flex:1;
+  }
+  header .brand-text .name{
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--plata);
+    line-height: 1;
+  }
+  header .brand-text .sub{
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--plata-tenue);
+    margin-top: 3px;
+  }
+
+  /* ---------- TABS ---------- */
+  .tabs{
+    display:flex;
+    gap: 0;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--linea);
+  }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding: 13px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--plata-tenue);
+    border-bottom: 2px solid transparent;
+    cursor:pointer;
+    user-select:none;
+    transition: color 0.15s;
+  }
+  .tab.active{
+    color: var(--plata);
+    border-bottom-color: var(--plata);
+  }
+
+  main{
+    flex:1;
+    padding: 18px 18px 110px;
+    overflow-y:auto;
+  }
+
+  /* ---------- DASHBOARD ---------- */
+  .dash{
+    margin-bottom: 22px;
+  }
+  .dash-grid{
+    display:flex;
+    gap: 10px;
+  }
+  .dash-card{
+    flex:1;
+    background: var(--negro-2);
+    border: 1px solid var(--linea);
+    border-radius: 12px;
+    padding: 16px 14px;
+    position: relative;
+    overflow:hidden;
+  }
+  .dash-card .star-mark{
+    position:absolute;
+    top: 10px;
+    right: 10px;
+    width: 12px;
+    height:12px;
+    opacity: 0.35;
+  }
+  .dash-card .label{
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--plata-tenue);
+    margin-bottom: 8px;
+  }
+  .dash-card .value{
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--plata);
+    line-height: 1;
+  }
+  .dash-card .value.small{ font-size: 22px; }
+  .dash-card .delta{
+    font-size: 11px;
+    margin-top: 6px;
+    display:flex;
+    align-items:center;
+    gap: 4px;
+  }
+  .dash-card .delta.up{ color: var(--verde); }
+  .dash-card .delta.down{ color: var(--rojo); }
+  .dash-card .delta.flat{ color: var(--plata-tenue); }
+
+  .dash-month-label{
+    font-size: 11px;
+    color: var(--plata-tenue);
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
+    display:flex;
+    justify-content: space-between;
+    align-items:baseline;
+  }
+  .dash-month-label .month-name{
+    font-family: var(--font-display);
+    font-size: 15px;
+    color: var(--plata);
+    font-weight:600;
+    letter-spacing: 0.02em;
+  }
+
+  .section-label{
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--plata-tenue);
+    margin: 4px 0 12px;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .section-label::after{
+    content:'';
+    flex:1;
+    height:1px;
+    background: var(--linea);
+  }
+
+  .empty{
+    text-align:center;
+    padding: 60px 24px;
+    color: var(--plata-tenue);
+  }
+  .empty .glyph{
+    width: 30px;
+    height: 30px;
+    margin: 0 auto 14px;
+    opacity: 0.4;
+  }
+  .empty p{ font-size: 13.5px; line-height:1.6; margin: 4px 0; color: var(--plata-suave); }
+  .empty .sub{ font-size: 12px; opacity: 0.7; }
+
+  /* ---------- ORDER CARD ---------- */
+  .card{
+    background: var(--negro-2);
+    border: 1px solid var(--linea);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card .edge{
+    position:absolute;
+    top:0; left:0; bottom:0;
+    width: 3px;
+  }
+  .card.deber .edge{ background: var(--rojo); }
+  .card.pagado .edge{ background: var(--verde); }
+
+  .card .inner{ padding: 15px 16px 15px 19px; }
+
+  .card .row-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom: 9px;
+  }
+  .card .pedido-id{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--plata-tenue);
+    letter-spacing: 0.06em;
+  }
+  .card .cliente{
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--plata);
+    margin-top: 2px;
+  }
+  .card .fecha{
+    font-size: 10.5px;
+    color: var(--plata-tenue);
+    text-align:right;
+    white-space:nowrap;
+  }
+
+  .card .detalle{
+    display:flex;
+    flex-wrap:wrap;
+    gap: 6px;
+    margin: 9px 0;
+  }
+  .chip{
+    font-size: 11.5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--negro-3);
+    color: var(--plata-suave);
+    border: 1px solid var(--linea);
+    letter-spacing: 0.02em;
+  }
+
+  .card .direccion{
+    font-size: 12px;
+    color: var(--plata-tenue);
+    margin: 7px 0 11px;
+    display:flex;
+    gap:6px;
+    align-items:flex-start;
+    line-height:1.4;
+  }
+
+  .card .money-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding-top: 11px;
+    border-top: 1px solid var(--linea);
+  }
+  .money-stats{
+    display:flex;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--plata-tenue);
+  }
+  .money-stats div b{
+    display:block;
+    font-size: 13.5px;
+    color: var(--plata-suave);
+    font-family: var(--font-mono);
+    font-weight: 400;
+  }
+
+  .por-pagar{ text-align:right; }
+  .por-pagar .label{
+    font-size: 9.5px;
+    text-transform:uppercase;
+    letter-spacing:0.07em;
+    color: var(--plata-tenue);
+    margin-bottom: 2px;
+  }
+  .por-pagar .amount{
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight:600;
+  }
+  .card.deber .por-pagar .amount{ color: var(--rojo); }
+  .card.pagado .por-pagar .amount{ color: var(--verde); }
+
+  .card .actions{
+    display:flex;
+    gap: 8px;
+    margin-top: 13px;
+  }
+  .btn-entrega{
+    flex:1;
+    background: var(--plata);
+    color: var(--negro);
+    border:none;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight:700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor:pointer;
+  }
+  .btn-entrega:active{ transform: scale(0.98); }
+  .btn-icon{
+    width: 44px;
+    background: var(--negro-3);
+    border: 1px solid var(--linea);
+    border-radius: 8px;
+    color: var(--plata-tenue);
+    font-size: 15px;
+    cursor:pointer;
+  }
+
+  /* ---------- HISTORIAL ---------- */
+  .month-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom: 18px;
+    padding: 4px 0;
+  }
+  .month-nav button{
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--linea);
+    background: var(--negro-2);
+    color: var(--plata-suave);
+    font-size: 15px;
+    cursor:pointer;
+  }
+  .month-nav button:disabled{ opacity: 0.3; cursor:default; }
+  .month-nav .current-month{
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--plata);
+    text-transform: capitalize;
+  }
+
+  .hist-search{
+    position: relative;
+    margin-bottom: 16px;
+  }
+  .hist-search input{
+    width:100%;
+    padding: 12px 14px 12px 38px;
+    border-radius: 10px;
+    border: 1px solid var(--linea);
+    background: var(--negro-2);
+    font-size: 14px;
+    color: var(--plata);
+  }
+  .hist-search input::placeholder{ color: var(--plata-tenue); }
+  .hist-search input:focus{ outline: none; border-color: var(--plata-tenue); }
+  .hist-search .ico{
+    position:absolute;
+    left: 13px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.5;
+    font-size: 13px;
+  }
+
+  .hist-item{
+    background: var(--negro-2);
+    border: 1px solid var(--linea);
+    border-radius: 10px;
+    padding: 13px 15px;
+    margin-bottom: 8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .hist-item .left .cliente{ font-weight:600; font-size:14px; color: var(--plata); }
+  .hist-item .left .meta{ font-size:10.5px; color:var(--plata-tenue); margin-top:3px; }
+  .hist-item .right{ text-align:right; }
+  .hist-item .right .tag{
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--verde);
+    background: var(--verde-suave);
+    padding: 2px 8px;
+    border-radius: 20px;
+    display:inline-block;
+    margin-bottom: 4px;
+  }
+  .hist-item .right .total{ font-family: var(--font-mono); font-size: 12.5px; color: var(--plata-suave); }
+
+  /* ---------- FAB ---------- */
+  .fab{
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(448px, calc(100% - 32px));
+    display:flex;
+    justify-content:flex-end;
+  }
+  .fab button{
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: var(--plata);
+    color: var(--negro);
+    border: none;
+    font-size: 26px;
+    font-weight: 300;
+    line-height: 1;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    cursor:pointer;
+  }
+  .fab button:active{ transform: scale(0.95); }
+
+  /* ---------- SHEET ---------- */
+  .sheet-overlay{
+    position: fixed;
+    inset:0;
+    background: rgba(0,0,0,0.65);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index: 50;
+  }
+  .sheet-overlay.show{ display:flex; }
+
+  .sheet{
+    background: var(--negro-2);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 20px 20px 0 0;
+    padding: 10px 20px 28px;
+    max-height: 92vh;
+    overflow-y:auto;
+    border-top: 1px solid var(--linea);
+    animation: slideUp 0.22s ease-out;
+  }
+  @keyframes slideUp{ from{ transform: translateY(30px); opacity:0; } to{ transform: translateY(0); opacity:1; } }
+
+  .sheet-handle{
+    width: 36px;
+    height: 4px;
+    background: var(--linea);
+    border-radius: 4px;
+    margin: 6px auto 16px;
+  }
+
+  .sheet h2{
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: var(--plata);
+  }
+  .sheet .hint{
+    font-size: 12.5px;
+    color: var(--plata-tenue);
+    margin: 0 0 18px;
+    line-height: 1.5;
+  }
+
+  .field{ margin-bottom: 15px; }
+  .field label{
+    display:block;
+    font-size: 11px;
+    font-weight:600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--plata-tenue);
+    margin-bottom: 7px;
+  }
+  textarea, input[type=text], input[type=number]{
+    width:100%;
+    border: 1px solid var(--linea);
+    background: var(--negro-3);
+    border-radius: 10px;
+    padding: 12px 13px;
+    font-size: 15px;
+    color: var(--plata);
+    font-family: var(--font-body);
+  }
+  textarea{
+    min-height: 92px;
+    resize: vertical;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  textarea:focus, input:focus{ outline: none; border-color: var(--plata-tenue); }
+  textarea::placeholder, input::placeholder{ color: var(--plata-tenue); opacity:0.6; }
+
+  .money-fields{ display:flex; gap: 10px; }
+  .money-fields .field{ flex:1; }
+
+  .preview-box{
+    background: var(--negro-3);
+    border: 1px solid var(--linea);
+    border-radius: 10px;
+    padding: 11px 13px;
+    font-size: 12.5px;
+    color: var(--plata-tenue);
+    margin: -5px 0 16px;
+    line-height: 1.7;
+  }
+  .preview-box b{ color: var(--plata); font-weight: 600; }
+  .preview-box .empty-hint{ color: var(--plata-tenue); font-style: italic; }
+
+  .por-pagar-preview{
+    text-align:center;
+    padding: 13px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+    border: 1px solid;
+  }
+  .por-pagar-preview .label{ font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color: var(--plata-tenue); }
+  .por-pagar-preview .amt{ font-family: var(--font-display); font-size: 25px; font-weight:600; margin-top:3px; }
+  .por-pagar-preview.deber{ background: var(--rojo-suave); border-color: rgba(192,57,43,0.3); }
+  .por-pagar-preview.deber .amt{ color: var(--rojo); }
+  .por-pagar-preview.pagado{ background: var(--verde-suave); border-color: rgba(74,155,110,0.3); }
+  .por-pagar-preview.pagado .amt{ color: var(--verde); }
+
+  .btn-guardar{
+    width:100%;
+    padding: 15px;
+    background: var(--plata);
+    color: var(--negro);
+    border:none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor:pointer;
+  }
+  .btn-guardar:active{ transform: scale(0.99); }
+  .btn-cancelar{
+    width:100%;
+    padding: 12px;
+    background: transparent;
+    border: none;
+    color: var(--plata-tenue);
+    font-size: 13px;
+    margin-top: 6px;
+    cursor:pointer;
+  }
+
+  .error-msg{
+    background: var(--rojo-suave);
+    color: #E08B7D;
+    font-size: 12.5px;
+    padding: 10px 13px;
+    border-radius: 8px;
+    margin: -5px 0 16px;
+    display:none;
+    border: 1px solid rgba(192,57,43,0.3);
+  }
+  .error-msg.show{ display:block; }
+
+  .toast{
+    position: fixed;
+    bottom: 100px;
+    left:50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--plata);
+    color: var(--negro);
+    padding: 11px 22px;
+    border-radius: 30px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity:0;
+    transition: all 0.25s ease;
+    pointer-events:none;
+    z-index: 60;
+    white-space:nowrap;
+  }
+  .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
+
+  ::-webkit-scrollbar{ width:0; height:0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <svg class="logo-star" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 5 C52 35 55 45 95 50 C55 55 52 65 50 95 C48 65 45 55 5 50 C45 45 48 35 50 5 Z" fill="#E8E8E8"/>
+    </svg>
+    <div class="brand-text">
+      <div class="name">ONYX LABEL</div>
+      <div class="sub">Wear your memories</div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="taller">Taller</div>
+    <div class="tab" data-tab="historial">Historial</div>
+  </div>
+
+  <main id="main"></main>
+
+  <div class="fab">
+    <button id="btnNuevo" aria-label="Nuevo pedido">+</button>
+  </div>
+
+  <div class="sheet-overlay" id="sheetOverlay">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2>Nuevo pedido</h2>
+      <p class="hint">Pega aquí el texto que te envió el cliente por WhatsApp.</p>
+
+      <div class="field">
+        <label for="pasteBox">Datos del cliente</label>
+        <textarea id="pasteBox" placeholder="Nombre: Juan Pérez&#10;Dirección: Av. Pajaritos 1234&#10;Color polera: Negro&#10;Talla: M"></textarea>
+      </div>
+
+      <div class="preview-box" id="previewBox">
+        <span class="empty-hint">Aquí verás los datos detectados.</span>
+      </div>
+
+      <div class="money-fields">
+        <div class="field">
+          <label for="montoTotal">Monto total</label>
+          <input type="number" id="montoTotal" placeholder="15000" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="montoAbonado">Monto abonado</label>
+          <input type="number" id="montoAbonado" placeholder="0" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="por-pagar-preview pagado" id="porPagarPreview" style="display:none;">
+        <div class="label">Por pagar</div>
+        <div class="amt" id="porPagarPreviewAmt">$0</div>
+      </div>
+
+      <div class="error-msg" id="errorMsg"></div>
+
+      <button class="btn-guardar" id="btnGuardar">Procesar y guardar</button>
+      <button class="btn-cancelar" id="btnCancelar">Cancelar</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'onyx_pedidos';
+  let pedidos = [];
+  let currentTab = 'taller';
+  let nextId = 1;
+  let historialMonthOffset = 0; // 0 = mes actual, -1 = mes anterior, etc.
+
+  const main = document.getElementById('main');
+  const sheetOverlay = document.getElementById('sheetOverlay');
+  const pasteBox = document.getElementById('pasteBox');
+  const previewBox = document.getElementById('previewBox');
+  const montoTotal = document.getElementById('montoTotal');
+  const montoAbonado = document.getElementById('montoAbonado');
+  const porPagarPreview = document.getElementById('porPagarPreview');
+  const porPagarPreviewAmt = document.getElementById('porPagarPreviewAmt');
+  const errorMsg = document.getElementById('errorMsg');
+  const toast = document.getElementById('toast');
+
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+  const STAR_SVG = '<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M50 5 C52 35 55 45 95 50 C55 55 52 65 50 95 C48 65 45 55 5 50 C45 45 48 35 50 5 Z" fill="#E8E8E8"/></svg>';
+
+  function fmt(n){
+    return '$' + Math.round(n).toLocaleString('es-CL');
+  }
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(()=> toast.classList.remove('show'), 1800);
+  }
+
+  async function loadPedidos(){
+    try{
+      const res = await window.storage.get(STORAGE_KEY, false);
+      if(res && res.value){
+        const data = JSON.parse(res.value);
+        pedidos = data.pedidos || [];
+        nextId = data.nextId || 1;
+      }
+    }catch(e){
+      pedidos = [];
+      nextId = 1;
+    }
+    render();
+  }
+
+  async function savePedidos(){
+    try{
+      await window.storage.set(STORAGE_KEY, JSON.stringify({pedidos, nextId}), false);
+    }catch(e){
+      showToast('No se pudo guardar. Intenta de nuevo.');
+    }
+  }
+
+  function parseTexto(texto){
+    const campos = { cliente:'', direccion:'', color:'', talla:'' };
+    const lineas = texto.split('\n');
+    lineas.forEach(linea=>{
+      const idx = linea.indexOf(':');
+      if(idx === -1) return;
+      const clave = linea.slice(0, idx).trim().toLowerCase();
+      const valor = linea.slice(idx+1).trim();
+      if(!valor) return;
+      if(clave.includes('nombre')) campos.cliente = valor;
+      else if(clave.includes('dirección') || clave.includes('direccion')) campos.direccion = valor;
+      else if(clave.includes('color')) campos.color = valor;
+      else if(clave.includes('talla')) campos.talla = valor;
+    });
+    return campos;
+  }
+
+  function actualizarPreview(){
+    const texto = pasteBox.value.trim();
+    if(!texto){
+      previewBox.innerHTML = '<span class="empty-hint">Aquí verás los datos detectados.</span>';
+    } else {
+      const c = parseTexto(texto);
+      const filas = [];
+      filas.push('Cliente: <b>' + (c.cliente || '—') + '</b>');
+      filas.push('Dirección: <b>' + (c.direccion || '—') + '</b>');
+      filas.push('Color: <b>' + (c.color || '—') + '</b> · Talla: <b>' + (c.talla || '—') + '</b>');
+      previewBox.innerHTML = filas.join('<br>');
+    }
+
+    const total = parseFloat(montoTotal.value) || 0;
+    const abonado = parseFloat(montoAbonado.value) || 0;
+    if(montoTotal.value === '' ){
+      porPagarPreview.style.display = 'none';
+    } else {
+      const porPagar = total - abonado;
+      porPagarPreview.style.display = 'block';
+      porPagarPreview.className = 'por-pagar-preview ' + (porPagar > 0 ? 'deber' : 'pagado');
+      porPagarPreviewAmt.textContent = fmt(porPagar);
+    }
+  }
+
+  pasteBox.addEventListener('input', actualizarPreview);
+  montoTotal.addEventListener('input', actualizarPreview);
+  montoAbonado.addEventListener('input', actualizarPreview);
+
+  function abrirSheet(){
+    pasteBox.value = '';
+    montoTotal.value = '';
+    montoAbonado.value = '';
+    errorMsg.classList.remove('show');
+    actualizarPreview();
+    sheetOverlay.classList.add('show');
+    setTimeout(()=> pasteBox.focus(), 200);
+  }
+  function cerrarSheet(){
+    sheetOverlay.classList.remove('show');
+  }
+
+  document.getElementById('btnNuevo').addEventListener('click', abrirSheet);
+  document.getElementById('btnCancelar').addEventListener('click', cerrarSheet);
+  sheetOverlay.addEventListener('click', (e)=>{ if(e.target === sheetOverlay) cerrarSheet(); });
+
+  document.getElementById('btnGuardar').addEventListener('click', async ()=>{
+    const texto = pasteBox.value.trim();
+    const campos = parseTexto(texto);
+    const total = parseFloat(montoTotal.value);
+    const abonado = parseFloat(montoAbonado.value);
+
+    if(!campos.cliente){
+      errorMsg.textContent = 'Falta el nombre del cliente. Revisa el texto pegado.';
+      errorMsg.classList.add('show');
+      return;
+    }
+    if(isNaN(total)){
+      errorMsg.textContent = 'Ingresa el monto total de la venta.';
+      errorMsg.classList.add('show');
+      return;
+    }
+    const abonadoFinal = isNaN(abonado) ? 0 : abonado;
+
+    const pedido = {
+      id: nextId,
+      fecha: new Date().toISOString(),
+      cliente: campos.cliente,
+      direccion: campos.direccion,
+      color: campos.color,
+      talla: campos.talla,
+      montoTotal: total,
+      montoAbonado: abonadoFinal,
+      porPagar: total - abonadoFinal,
+      estado: 'Pendiente'
+    };
+
+    pedidos.unshift(pedido);
+    nextId += 1;
+    await savePedidos();
+    cerrarSheet();
+    showToast('Pedido guardado ✓');
+    render();
+  });
+
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      currentTab = tab.dataset.tab;
+      if(currentTab === 'historial') historialMonthOffset = 0;
+      render();
+    });
+  });
+
+  function fechaCorta(iso){
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-CL', {day:'2-digit', month:'2-digit'}) + ' ' +
+           d.toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'});
+  }
+
+  async function marcarEntregado(id){
+    const p = pedidos.find(x=>x.id === id);
+    if(p){
+      p.estado = 'Entregado';
+      await savePedidos();
+      showToast('Pedido marcado como entregado');
+      render();
+    }
+  }
+
+  async function eliminarPedido(id){
+    pedidos = pedidos.filter(x=>x.id !== id);
+    await savePedidos();
+    render();
+  }
+
+  function getMonthKey(date){
+    return date.getFullYear() + '-' + String(date.getMonth()).padStart(2,'0');
+  }
+
+  function getMonthBounds(offset){
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const start = new Date(target.getFullYear(), target.getMonth(), 1);
+    const end = new Date(target.getFullYear(), target.getMonth() + 1, 1);
+    return { start, end, year: target.getFullYear(), month: target.getMonth() };
+  }
+
+  function dashboardStats(){
+    // Mes actual: todos los pedidos (pendientes + entregados) creados este mes cuentan como venta
+    const { start: curStart, end: curEnd } = getMonthBounds(0);
+    const { start: prevStart, end: prevEnd } = getMonthBounds(-1);
+
+    const pedidosMesActual = pedidos.filter(p=>{
+      const f = new Date(p.fecha);
+      return f >= curStart && f < curEnd;
+    });
+    const pedidosMesAnterior = pedidos.filter(p=>{
+      const f = new Date(p.fecha);
+      return f >= prevStart && f < prevEnd;
+    });
+
+    const totalActual = pedidosMesActual.reduce((s,p)=> s + p.montoTotal, 0);
+    const totalAnterior = pedidosMesAnterior.reduce((s,p)=> s + p.montoTotal, 0);
+    const countActual = pedidosMesActual.length;
+    const countAnterior = pedidosMesAnterior.length;
+
+    return { totalActual, totalAnterior, countActual, countAnterior };
+  }
+
+  function deltaHtml(actual, anterior){
+    if(anterior === 0 && actual === 0){
+      return '<div class="delta flat">Sin datos del mes pasado</div>';
+    }
+    if(anterior === 0){
+      return '<div class="delta up">▲ Primeras ventas del mes</div>';
+    }
+    const diff = ((actual - anterior) / anterior) * 100;
+    if(Math.abs(diff) < 1){
+      return '<div class="delta flat">≈ Igual que el mes pasado</div>';
+    }
+    if(diff > 0){
+      return '<div class="delta up">▲ ' + Math.round(diff) + '% vs mes pasado</div>';
+    }
+    return '<div class="delta down">▼ ' + Math.round(Math.abs(diff)) + '% vs mes pasado</div>';
+  }
+
+  function renderDashboard(){
+    const { totalActual, totalAnterior, countActual, countAnterior } = dashboardStats();
+    const now = new Date();
+    const monthName = MESES[now.getMonth()];
+
+    return `
+      <div class="dash">
+        <div class="dash-month-label">
+          <span>Resumen del mes</span>
+          <span class="month-name">${monthName} ${now.getFullYear()}</span>
+        </div>
+        <div class="dash-grid">
+          <div class="dash-card">
+            <div class="star-mark">${STAR_SVG}</div>
+            <div class="label">Vendido</div>
+            <div class="value">${fmt(totalActual)}</div>
+            ${deltaHtml(totalActual, totalAnterior)}
+          </div>
+          <div class="dash-card">
+            <div class="star-mark">${STAR_SVG}</div>
+            <div class="label">Pedidos</div>
+            <div class="value small">${countActual}</div>
+            ${deltaHtml(countActual, countAnterior)}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderTaller(){
+    const pendientes = pedidos.filter(p=>p.estado === 'Pendiente');
+
+    let html = renderDashboard();
+    html += '<div class="section-label">En producción</div>';
+
+    if(pendientes.length === 0){
+      html += `
+        <div class="empty">
+          <div class="glyph">${STAR_SVG}</div>
+          <p><b>No hay pedidos en producción.</b></p>
+          <p class="sub">Toca el botón + para registrar el siguiente.</p>
+        </div>`;
+      main.innerHTML = html;
+      return;
+    }
+
+    html += pendientes.map(p=>{
+      const debe = p.porPagar > 0;
+      return `
+        <div class="card ${debe ? 'deber' : 'pagado'}">
+          <div class="edge"></div>
+          <div class="inner">
+            <div class="row-top">
+              <div>
+                <div class="pedido-id">PEDIDO N° ${String(p.id).padStart(3,'0')}</div>
+                <div class="cliente">${escapeHtml(p.cliente)}</div>
+              </div>
+              <div class="fecha">${fechaCorta(p.fecha)}</div>
+            </div>
+            <div class="detalle">
+              ${p.color ? `<span class="chip">${escapeHtml(p.color)}</span>` : ''}
+              ${p.talla ? `<span class="chip">Talla ${escapeHtml(p.talla)}</span>` : ''}
+            </div>
+            ${p.direccion ? `<div class="direccion"><span>📍</span><span>${escapeHtml(p.direccion)}</span></div>` : ''}
+            <div class="money-row">
+              <div class="money-stats">
+                <div>Total<b>${fmt(p.montoTotal)}</b></div>
+                <div>Abonó<b>${fmt(p.montoAbonado)}</b></div>
+              </div>
+              <div class="por-pagar">
+                <div class="label">${debe ? 'Debe pagar' : 'Pagado'}</div>
+                <div class="amount">${fmt(p.porPagar)}</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn-entrega" onclick="appMarcarEntregado(${p.id})">Lista para entrega</button>
+              <button class="btn-icon" onclick="appEliminarPedido(${p.id})" aria-label="Eliminar">✕</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    main.innerHTML = html;
+  }
+
+  function renderHistorial(){
+    const { start, end, year, month } = getMonthBounds(historialMonthOffset);
+    const entregadosDelMes = pedidos.filter(p=>{
+      if(p.estado !== 'Entregado') return false;
+      const f = new Date(p.fecha);
+      return f >= start && f < end;
+    }).sort((a,b)=> new Date(b.fecha) - new Date(a.fecha));
+
+    const totalMes = entregadosDelMes.reduce((s,p)=> s + p.montoTotal, 0);
+    const esMesActual = historialMonthOffset === 0;
+
+    let html = `
+      <div class="month-nav">
+        <button id="prevMonth" aria-label="Mes anterior">‹</button>
+        <div class="current-month">${MESES[month]} ${year}</div>
+        <button id="nextMonth" aria-label="Mes siguiente" ${esMesActual ? 'disabled' : ''}>›</button>
+      </div>`;
+
+    if(entregadosDelMes.length > 0){
+      html += `<div class="section-label">${entregadosDelMes.length} entregados · ${fmt(totalMes)}</div>`;
+    }
+
+    html += `
+      <div class="hist-search">
+        <span class="ico">🔎</span>
+        <input type="text" id="buscadorInput" placeholder="Buscar cliente...">
+      </div>`;
+
+    if(entregadosDelMes.length === 0){
+      html += `
+        <div class="empty">
+          <div class="glyph">${STAR_SVG}</div>
+          <p><b>Sin entregas registradas este mes.</b></p>
+          <p class="sub">Navega entre meses con las flechas de arriba.</p>
+        </div>`;
+      main.innerHTML = html;
+      bindMonthNav();
+      return;
+    }
+
+    html += '<div id="histList">' + entregadosDelMes.map(histItemHtml).join('') + '</div>';
+    main.innerHTML = html;
+    bindMonthNav();
+    bindBuscador(entregadosDelMes);
+  }
+
+  function bindMonthNav(){
+    const prev = document.getElementById('prevMonth');
+    const next = document.getElementById('nextMonth');
+    if(prev) prev.addEventListener('click', ()=>{ historialMonthOffset -= 1; render(); });
+    if(next) next.addEventListener('click', ()=>{ if(historialMonthOffset < 0){ historialMonthOffset += 1; render(); } });
+  }
+
+  function histItemHtml(p){
+    return `
+      <div class="hist-item">
+        <div class="left">
+          <div class="cliente">${escapeHtml(p.cliente)}</div>
+          <div class="meta">N° ${String(p.id).padStart(3,'0')} · ${fechaCorta(p.fecha)}</div>
+        </div>
+        <div class="right">
+          <div class="tag">Entregado</div>
+          <div class="total">${fmt(p.montoTotal)}</div>
+        </div>
+      </div>`;
+  }
+
+  function bindBuscador(entregados){
+    const input = document.getElementById('buscadorInput');
+    if(!input) return;
+    input.addEventListener('input', ()=>{
+      const q = input.value.trim().toLowerCase();
+      const filtrados = entregados.filter(p=> p.cliente.toLowerCase().includes(q));
+      const list = document.getElementById('histList');
+      if(list){
+        list.innerHTML = filtrados.length
+          ? filtrados.map(histItemHtml).join('')
+          : '<div class="empty"><p class="sub">Sin resultados para "' + escapeHtml(input.value) + '"</p></div>';
+      }
+    });
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  function render(){
+    if(currentTab === 'taller') renderTaller();
+    else renderHistorial();
+  }
+
+  window.appMarcarEntregado = marcarEntregado;
+  window.appEliminarPedido = eliminarPedido;
+
+  loadPedidos();
+})();
+</script>
+</body>
+</html>
