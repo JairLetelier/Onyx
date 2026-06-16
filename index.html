@@ -16,7 +16,6 @@
     <p class="text-xs text-[#5A5A5A] tracking-wider" id="loadingText">Sincronizando con Google Sheets...</p>
   </div>
 
-  <!-- Contenedor adaptativo: Cambiado de max-w-[480px] a max-w-7xl para adaptarse a PCs -->
   <div class="max-w-7xl w-full mx-auto min-h-screen flex flex-col relative bg-[#0A0A0A] bg-[radial-gradient(ellipse_800px_400px_at_50%_-10%,rgba(255,255,255,0.05),transparent_70%)] shadow-2xl shadow-black/50">
     
     <div id="connBanner" class="hidden bg-red-950/40 border-b border-red-900/30 text-[#E08B7D] text-xs p-2.5 flex items-center justify-center gap-2">
@@ -81,6 +80,18 @@
 
         <button id="btnGuardar" class="w-full p-4 bg-[#E8E8E8] text-[#0A0A0A] rounded-lg text-sm font-bold tracking-wider uppercase active:scale-[0.99] disabled:opacity-50 hover:bg-white transition-all mb-2">Guardar Pedido</button>
         <button id="btnCancelar" class="w-full p-2 text-xs text-[#5A5A5A] uppercase tracking-wider text-center hover:text-[#9C9C9C] transition-colors">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal Confirmación Custom -->
+    <div id="confirmOverlay" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 backdrop-blur-sm opacity-0 transition-opacity duration-200">
+      <div id="confirmBox" class="bg-[#141414] border border-[#2A2A2A] rounded-2xl p-6 w-[90%] max-w-[360px] transform scale-95 transition-transform duration-200 shadow-2xl">
+        <h3 id="confirmTitle" class="font-display text-xl font-semibold text-[#E8E8E8] mb-2">Confirmar</h3>
+        <p id="confirmMessage" class="text-sm text-[#9C9C9C] mb-6 leading-relaxed">¿Estás seguro?</p>
+        <div class="flex justify-end gap-3">
+          <button id="btnConfirmCancel" class="px-4 py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase text-[#5A5A5A] hover:text-[#E8E8E8] hover:bg-[#1C1C1C] transition-all">Cancelar</button>
+          <button id="btnConfirmOk" class="px-5 py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase transition-all">Aceptar</button>
+        </div>
       </div>
     </div>
 

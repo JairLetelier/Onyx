@@ -1,10 +1,10 @@
 (function(){
-  const API_URL = 'https://script.google.com/macros/s/AKfycbz588_UceGmqWqu9J_4U5ntXw91qyKEH0oyV6L0zOXL77RXcDPg2kmiulMWdcIjSb9sew/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyQ9DQN3Y8nhp_PcNSrgM9ehY_nWO1HXo0335uHpCv_mL6GD5w_--Dv6MTdlGs3xnhs/exec';
   let pedidos = [];
   let currentTab = 'taller';
   let historialMonthOffset = 0;
   let isOnline = true;
-  let editId = null; // Variable para saber si estamos editando
+  let editId = null;
 
   const $ = id => document.getElementById(id);
   const main = $('main'), sheet = $('sheetOverlay'), pasteBox = $('pasteBox'), previewBox = $('previewBox'), montoTotal = $('montoTotal'), montoAbonado = $('montoAbonado'), porPagarPreview = $('porPagarPreview'), porPagarPreviewAmt = $('porPagarPreviewAmt'), errorMsg = $('errorMsg'), toast = $('toast'), loadingScreen = $('loadingScreen'), connBanner = $('connBanner'), btnGuardar = $('btnGuardar'), modalTitle = $('modalTitle');
@@ -14,7 +14,6 @@
 
   const fmt = n => '$' + Math.round(n).toLocaleString('es-CL');
   
-  // Novedad: Capitalizar cada palabra
   const capitalize = str => {
     if (!str) return '';
     return str.toLowerCase().replace(/(?:^|[\s-])\w/g, match => match.toUpperCase());
@@ -30,13 +29,59 @@
     }, 2500);
   }
 
+  // Lógica del Modal de Confirmación
+  function customConfirm(title, message, isDanger = false) {
+    return new Promise((resolve) => {
+      const overlay = $('confirmOverlay');
+      const box = $('confirmBox');
+      const btnOk = $('btnConfirmOk');
+      const btnCancel = $('btnConfirmCancel');
+
+      $('confirmTitle').textContent = title;
+      $('confirmMessage').textContent = message;
+
+      if (isDanger) {
+        btnOk.className = "px-5 py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase bg-red-950/40 text-red-400 border border-red-900/50 hover:bg-red-900/60 transition-all";
+        btnOk.textContent = "Eliminar";
+      } else {
+        btnOk.className = "px-5 py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase bg-[#E8E8E8] text-[#0A0A0A] hover:bg-white transition-all";
+        btnOk.textContent = "Confirmar";
+      }
+
+      const closeAndResolve = (result) => {
+        overlay.classList.remove('opacity-100');
+        overlay.classList.add('opacity-0');
+        box.classList.remove('scale-100');
+        box.classList.add('scale-95');
+        setTimeout(() => {
+          overlay.classList.add('hidden');
+          overlay.classList.remove('flex');
+        }, 200);
+        btnOk.onclick = null;
+        btnCancel.onclick = null;
+        resolve(result);
+      };
+
+      btnOk.onclick = () => closeAndResolve(true);
+      btnCancel.onclick = () => closeAndResolve(false);
+
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+      requestAnimationFrame(() => {
+        overlay.classList.remove('opacity-0');
+        overlay.classList.add('opacity-100');
+        box.classList.remove('scale-95');
+        box.classList.add('scale-100');
+      });
+    });
+  }
+
   function setOnlineStatus(online){
     isOnline = online;
     connBanner.classList.toggle('hidden', online);
     connBanner.classList.toggle('flex', !online);
   }
 
-  // Novedad: Respaldo Local (Local Storage)
   function guardarRespaldoLocal() {
     localStorage.setItem('onyx_pedidos', JSON.stringify(pedidos));
   }
@@ -54,7 +99,6 @@
   }
 
   async function cargarPedidos(mostrarLoader){
-    // Carga rápida del respaldo local primero
     const respaldo = localStorage.getItem('onyx_pedidos');
     if (respaldo) {
       pedidos = JSON.parse(respaldo);
@@ -87,14 +131,13 @@
       const idx = linea.indexOf(':');
       if(idx === -1) return;
       const clave = linea.slice(0, idx).trim().toLowerCase();
-      // Capitalizamos el valor automáticamente al detectarlo
       const valor = capitalize(linea.slice(idx + 1).trim());
       if(!valor) return;
       
       if(clave.includes('nombre') || clave.includes('cliente')) campos.cliente = valor;
       else if(clave.includes('tel') || clave.includes('cel')) campos.telefono = valor;
       else if(clave.includes('dirección') || clave.includes('direccion')) campos.direccion = valor;
-      else if(clave.includes('color')) campos.color = valor;
+      else if(clave.includes('color') || clave.includes('polera')) campos.color = valor;
       else if(clave.includes('talla')) campos.talla = valor;
     });
     return campos;
@@ -106,7 +149,7 @@
       previewBox.innerHTML = '<span class="italic text-[#5A5A5A]">Aquí verás los datos detectados.</span>';
     } else {
       const c = parseTexto(texto);
-      previewBox.innerHTML = `Cliente: <b>${c.cliente || '—'}</b> ${c.telefono ? `(📞 ${c.telefono})` : ''}<br>Dirección: <b>${c.direccion || '—'}</b><br>Color: <b>${c.color || '—'}</b> · Talla: <b>${c.talla || '—'}</b>`;
+      previewBox.innerHTML = `Cliente: <b>${c.cliente || '—'}</b> ${c.telefono ? `(📞 ${c.telefono})` : ''}<br>Dirección: <b>${c.direccion || '—'}</b><br>Producto: <b>Polera ${c.color || ''} ${c.talla ? `(Talla ${c.talla})` : ''}</b>`;
     }
 
     const total = parseFloat(montoTotal.value) || 0;
@@ -127,7 +170,6 @@
     montoAbonado.addEventListener(evt, actualizarPreview);
   });
 
-  // Función para abrir el modal (sirve para Nuevo y Editar)
   const abrirModal = (id = null) => {
     editId = id;
     errorMsg.classList.add('hidden');
@@ -135,7 +177,6 @@
     if (id) {
       modalTitle.textContent = "Editar pedido";
       const p = pedidos.find(x => x.id === id);
-      // Pre-llenar datos
       pasteBox.value = `Nombre: ${p.cliente}\nTeléfono: ${p.telefono || ''}\nDirección: ${p.direccion || ''}\nColor: ${p.color || ''}\nTalla: ${p.talla || ''}`;
       montoTotal.value = p.montoTotal;
       montoAbonado.value = p.montoAbonado;
@@ -151,7 +192,7 @@
   };
 
   $('btnNuevo').addEventListener('click', () => abrirModal(null));
-  window.appEditarPedido = abrirModal; // Exponemos la función
+  window.appEditarPedido = abrirModal;
 
   const cerrarSheet = () => { sheet.classList.remove('flex'); sheet.classList.add('hidden'); };
   $('btnCancelar').addEventListener('click', cerrarSheet);
@@ -180,11 +221,9 @@
 
     try{
       if (editId) {
-        // Lógica de Edición
         await apiRequest('update', { id: editId, ...payload });
         showToast('Pedido actualizado ✓');
       } else {
-        // Lógica de Creación
         payload.fecha = new Date().toISOString();
         payload.estado = 'Pendiente';
         await apiRequest('create', { pedido: payload });
@@ -226,8 +265,12 @@
   };
 
   window.appMarcarEntregado = async id => {
-    // Novedad: Confirmación al marcar entregado
-    if(!confirm('¿Marcar este pedido como entregado? Se moverá al historial.')) return;
+    const confirmado = await customConfirm(
+      'Entregar pedido', 
+      '¿Marcar este pedido como entregado? Se moverá a la pestaña de historial.', 
+      false
+    );
+    if(!confirmado) return;
 
     const p = pedidos.find(x => x.id === id);
     if(!p) return;
@@ -250,8 +293,12 @@
   };
 
   window.appEliminarPedido = async id => {
-    // Novedad: Confirmación obligatoria antes de eliminar
-    if(!confirm('🚨 ¿Estás seguro de eliminar este pedido? Esta acción no se puede deshacer.')) return;
+    const confirmado = await customConfirm(
+      'Eliminar pedido', 
+      '¿Estás seguro de eliminar este pedido permanentemente? Esta acción no se puede deshacer.', 
+      true
+    );
+    if(!confirmado) return;
 
     const respaldo = pedidos;
     pedidos = pedidos.filter(x => x.id !== id);
@@ -285,8 +332,6 @@
     const bAct = getMonthBounds(0);
     const pAct = pedidos.filter(p => { let f = new Date(p.fecha); return f >= bAct.start && f < bAct.end; });
 
-    // Novedad: Estadísticas de Ingresos Reales
-    // Ingresos Reales = Lo que ya pagaron los entregados + los abonos de los pendientes
     const ingresosReales = pAct.reduce((s,p) => s + (p.estado === 'Entregado' ? p.montoTotal : p.montoAbonado), 0);
     const ventasTotales = pAct.reduce((s,p) => s + p.montoTotal, 0);
     const cAct = pAct.length;
@@ -331,7 +376,7 @@
           <input type="text" id="buscadorTaller" class="w-full py-2.5 pl-9 pr-4 rounded-lg border border-[#2A2A2A] bg-[#141414] text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="Buscar pedido pendiente...">
         </div>
       </div>
-      <div id="tallerList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`; // Novedad: Grid responsivo
+      <div id="tallerList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
 
     const generarHTMLCartas = (lista) => {
       if(lista.length === 0){
@@ -351,10 +396,11 @@
                 </div>
                 <div class="text-[10px] text-[#5A5A5A] text-right whitespace-nowrap">${fechaCorta(p.fecha)}</div>
               </div>
+              
               <div class="flex flex-wrap gap-1.5 my-3">
-                ${p.color ? `<span class="text-xs px-2.5 py-1 rounded-md bg-[#1C1C1C] text-[#9C9C9C] border border-[#2A2A2A]">${escapeHtml(p.color)}</span>` : ''}
-                ${p.talla ? `<span class="text-xs px-2.5 py-1 rounded-md bg-[#1C1C1C] text-[#9C9C9C] border border-[#2A2A2A]">Talla ${escapeHtml(p.talla)}</span>` : ''}
+                ${(p.color || p.talla) ? `<span class="text-xs px-3 py-1.5 rounded-md bg-[#1C1C1C] text-[#E8E8E8] border border-[#2A2A2A] font-medium tracking-wide shadow-sm">👕 Polera ${p.color ? escapeHtml(p.color) : ''} ${p.talla ? `· Talla ${escapeHtml(p.talla)}` : ''}</span>` : ''}
               </div>
+
               ${p.direccion ? `<div class="text-[12.5px] text-[#9C9C9C] my-2 flex gap-2 items-start leading-relaxed bg-[#1C1C1C] p-2.5 rounded-lg border border-[#2A2A2A]/50"><span>📍</span><span class="flex-1">${escapeHtml(p.direccion)}</span></div>` : ''}
               
               <div class="mt-auto pt-4 border-t border-[#2A2A2A] mt-4 flex justify-between items-end">
@@ -381,7 +427,6 @@
     html += generarHTMLCartas(pendientes) + `</div>`;
     main.innerHTML = html;
 
-    // Lógica del buscador del taller
     const buscador = $('buscadorTaller');
     if (buscador) {
       buscador.addEventListener('input', (e) => {
@@ -436,7 +481,6 @@
         </div>
       </div>`;
 
-    // Novedad: Grid responsivo también en el historial
     html += `<div id="histList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">${entregados.map(itemHtml).join('')}</div>`;
     main.innerHTML = html;
 
