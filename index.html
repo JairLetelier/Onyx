@@ -4,6 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
   <title>Onyx Label · Pedidos</title>
+
+  <!-- ✅ MEJORA 2: PWA — ocultar barra del navegador al agregar a pantalla de inicio -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Onyx Label">
+  <meta name="theme-color" content="#0A0A0A">
+  <link rel="manifest" href="manifest.json">
+  <!-- Fin PWA -->
+
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="styles.css">
   <link rel="apple-touch-icon" href="Onyx.png">
@@ -39,9 +49,11 @@
       <button data-tab="historial" class="tab flex-1 text-center py-4 text-sm font-semibold tracking-wider uppercase text-[#5A5A5A] border-b-2 border-transparent transition-colors duration-150">Historial</button>
     </nav>
 
-    <main id="main" class="flex-1 p-[18px] md:p-6 pb-28 overflow-y-auto"></main>
+    <!-- ✅ MEJORA 3 (tablet): pb-36 en móvil y pb-32 en md para que el botón flotante no tape contenido -->
+    <main id="main" class="flex-1 p-[18px] md:p-6 pb-36 md:pb-32 overflow-y-auto"></main>
 
-    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-7xl flex justify-end px-4 md:px-8">
+    <!-- ✅ MEJORA 3 (tablet): se eliminó el max-w-7xl del contenedor del botón para que se posicione correctamente en tablets -->
+    <div class="fixed bottom-6 right-4 md:right-8 z-30">
       <button id="btnNuevo" class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#E8E8E8] text-[#0A0A0A] text-3xl font-light shadow-2xl shadow-white/10 active:scale-95 hover:bg-white transition-all" aria-label="Nuevo pedido">+</button>
     </div>
 
@@ -77,6 +89,12 @@
           <div id="porPagarPreviewAmt" class="font-display text-2xl font-semibold mt-1"></div>
         </div>
 
+        <!-- ✅ MEJORA 1: Alerta de stock visible en el modal al guardar -->
+        <div id="stockAlert" class="bg-amber-950/30 border border-amber-800/40 text-amber-400 text-xs p-3 rounded-lg mb-5 hidden flex items-start gap-2">
+          <span class="text-base leading-none">⚠️</span>
+          <span>No hay stock disponible para esta talla/color. El pedido quedará marcado como <b>"Por Comprar"</b> hasta que actualices el stock.</span>
+        </div>
+
         <div id="errorMsg" class="bg-red-950/14 text-[#E08B7D] text-xs p-3 rounded-lg mb-5 hidden border border-red-900/30"></div>
 
         <button id="btnGuardar" class="w-full p-4 bg-[#E8E8E8] text-[#0A0A0A] rounded-lg text-sm font-bold tracking-wider uppercase active:scale-[0.99] disabled:opacity-50 hover:bg-white transition-all mb-2">Guardar Pedido</button>
@@ -97,10 +115,9 @@
     </div>
 
     <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#E8E8E8] text-[#0A0A0A] px-5 py-3 rounded-full text-sm font-semibold opacity-0 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap shadow-xl"></div>
-    
 
   </div>
 
   <script src="app.js"></script>
 </body>
-</html> 
+</html>

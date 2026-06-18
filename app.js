@@ -1,5 +1,5 @@
 (function(){
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyQ9DQN3Y8nhp_PcNSrgM9ehY_nWO1HXo0335uHpCv_mL6GD5w_--Dv6MTdlGs3xnhs/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbxW8CAqPf050zczmTHcRVMvvPIvYzwrP-BtbC_USoEvEmqi0orOEw-tV3HAjZt9CYRCdQ/exec';
   let pedidos = [];
   let currentTab = 'taller';
   let historialMonthOffset = 0;
@@ -173,6 +173,9 @@
   const abrirModal = (id = null) => {
     editId = id;
     errorMsg.classList.add('hidden');
+    // ✅ MEJORA 1: ocultar alerta de stock al abrir modal
+    const stockAlert = $('stockAlert');
+    if (stockAlert) stockAlert.classList.add('hidden');
     
     if (id) {
       modalTitle.textContent = "Editar pedido";
@@ -220,13 +223,28 @@
     };
 
     try{
+      let respuesta;
       if (editId) {
-        await apiRequest('update', { id: editId, ...payload });
+        respuesta = await apiRequest('update', { id: editId, ...payload });
         showToast('Pedido actualizado ✓');
       } else {
         payload.fecha = new Date().toISOString();
         payload.estado = 'Pendiente';
-        await apiRequest('create', { pedido: payload });
+        // ✅ MEJORA 1: el backend puede responder { sinStock: true } para marcar pedido
+        respuesta = await apiRequest('create', { pedido: payload });
+        
+        // Si el backend indica falta de stock, mostrar alerta pero continuar
+        if (respuesta && respuesta.sinStock) {
+          const stockAlert = $('stockAlert');
+          if (stockAlert) stockAlert.classList.remove('hidden');
+          // No cerrar el modal — el pedido ya fue guardado con sinStock:true en el backend
+          // Solo reload y mostrar toast especial
+          showToast('⚠️ Guardado · Sin stock disponible');
+          setOnlineStatus(true);
+          cerrarSheet();
+          await cargarPedidos(false);
+          return;
+        }
         showToast('Pedido guardado ✓');
       }
       
@@ -384,9 +402,20 @@
       }
       return lista.map(p => {
         const debe = p.porPagar > 0;
+        // ✅ MEJORA 1: detectar pedidos sin stock
+        const sinStock = !!p.sinStock;
+
         return `
-          <div class="bg-[#141414] border border-[#2A2A2A] rounded-xl relative overflow-hidden flex flex-col hover:border-[#5A5A5A] transition-colors">
-            <div class="absolute top-0 left-0 bottom-0 w-[3px] ${debe ? 'bg-red-600' : 'bg-emerald-600'}"></div>
+          <div class="bg-[#141414] border ${sinStock ? 'border-amber-800/50' : 'border-[#2A2A2A]'} rounded-xl relative overflow-hidden flex flex-col hover:border-[#5A5A5A] transition-colors">
+            <div class="absolute top-0 left-0 bottom-0 w-[3px] ${sinStock ? 'bg-amber-500' : (debe ? 'bg-red-600' : 'bg-emerald-600')}"></div>
+            
+            ${sinStock ? `
+            <!-- ✅ MEJORA 1: Banner de alerta "Por Comprar" -->
+            <div class="bg-amber-950/30 border-b border-amber-800/30 px-4 py-2 flex items-center gap-2">
+              <span class="text-sm">⚠️</span>
+              <span class="text-[10px] font-bold uppercase tracking-widest text-amber-400">Por Comprar · Falta Stock</span>
+            </div>` : ''}
+
             <div class="p-5 pl-6 flex-1 flex flex-col">
               <div class="flex justify-between items-start mb-2">
                 <div>
@@ -397,8 +426,12 @@
                 <div class="text-[10px] text-[#5A5A5A] text-right whitespace-nowrap">${fechaCorta(p.fecha)}</div>
               </div>
               
+              <!-- ✅ MEJORA 1: Chip de talla y color siempre visible y destacado -->
               <div class="flex flex-wrap gap-1.5 my-3">
-                ${(p.color || p.talla) ? `<span class="text-xs px-3 py-1.5 rounded-md bg-[#1C1C1C] text-[#E8E8E8] border border-[#2A2A2A] font-medium tracking-wide shadow-sm">👕 Polera ${p.color ? escapeHtml(p.color) : ''} ${p.talla ? `· Talla ${escapeHtml(p.talla)}` : ''}</span>` : ''}
+                ${(p.color || p.talla) ? `
+                <span class="text-xs px-3 py-1.5 rounded-md ${sinStock ? 'bg-amber-950/20 border-amber-800/40 text-amber-300' : 'bg-[#1C1C1C] border-[#2A2A2A] text-[#E8E8E8]'} border font-medium tracking-wide shadow-sm">
+                  👕 Polera ${p.color ? escapeHtml(p.color) : ''}${p.talla ? ` · Talla ${escapeHtml(p.talla)}` : ''}
+                </span>` : ''}
               </div>
 
               ${p.direccion ? `<div class="text-[12.5px] text-[#9C9C9C] my-2 flex gap-2 items-start leading-relaxed bg-[#1C1C1C] p-2.5 rounded-lg border border-[#2A2A2A]/50"><span>📍</span><span class="flex-1">${escapeHtml(p.direccion)}</span></div>` : ''}
@@ -474,6 +507,7 @@
         <div>
           <div class="font-semibold text-[15px] text-[#E8E8E8]">${escapeHtml(p.cliente)}</div>
           <div class="text-[11px] text-[#5A5A5A] mt-1">N° ${String(p.id).padStart(3,'0')} · ${fechaCorta(p.fecha)}</div>
+          ${(p.color || p.talla) ? `<div class="text-[11px] text-[#5A5A5A] mt-1">👕 Polera ${p.color ? escapeHtml(p.color) : ''}${p.talla ? ` · Talla ${escapeHtml(p.talla)}` : ''}</div>` : ''}
         </div>
         <div class="text-right flex flex-col items-end">
           <span class="text-[9px] uppercase tracking-widest font-bold text-emerald-400 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-900/40 mb-1.5">Entregado</span>
