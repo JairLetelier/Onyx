@@ -274,9 +274,12 @@
   };
 
   function calcSinStock(p){
-    if(!p.sinStock) return false;
-    const item=stock.find(s=>norm(s.color)===norm(p.color)&&norm(s.talla)===norm(p.talla));
-    return !item||Number(item.cantidad)<=0;
+    // El backend reconcilia el campo sinStock en cada carga (doGet), asignando
+    // unidades disponibles al pedido pendiente más antiguo de cada talla/color.
+    // Por eso aquí confiamos directamente en el valor que llega de la hoja,
+    // sin volver a cruzarlo contra el stock local (eso causaba que 2 pedidos
+    // de la misma talla cambiaran de alerta a la vez al agregar 1 sola unidad).
+    return !!p.sinStock;
   }
 
   function renderDashboard(){
