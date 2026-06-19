@@ -1,5 +1,5 @@
 (function(){
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzY-Uq4pR8FqXjQTFf183sLfbppugJhxpFnxUl2bb-GE7YQCNtYQIfrHUFMEAGTrGcIyQ/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbx5V2St_g90HbzSaK3BXgRfE3W2z91wkfkb8lUGjOFhPoPsR58Tux7s_7L-FnHN-M6JVg/exec';
   let pedidos = [], stock = [], currentTab = 'taller', historialMonthOffset = 0, editId = null;
 
   // --- Helpers ---
