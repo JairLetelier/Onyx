@@ -90,7 +90,19 @@
         if(k.includes('nombre')||k.includes('cliente')) c.cliente=v;
         else if(k.includes('tel')||k.includes('cel')||k.includes('fono')) c.telefono=l.slice(i+1).trim();
         else if(k.includes('direcci')) c.direccion=v;
-        else if(k.includes('color')||k.includes('polera')) c.color=v;
+        else if(k.includes('polera')){
+          // "Polera: negro xl" -> separa color y talla si vienen juntos
+          const TALLAS=['XS','S','M','L','XL','XXL','XXXL'];
+          const partes=l.slice(i+1).trim().split(/\s+/);
+          const ultima=partes[partes.length-1].toUpperCase();
+          if(partes.length>1 && TALLAS.includes(ultima)){
+            c.talla=ultima;
+            c.color=cap(partes.slice(0,-1).join(' '));
+          } else {
+            c.color=v;
+          }
+        }
+        else if(k.includes('color')) c.color=v;
         else if(k.includes('talla')) c.talla=l.slice(i+1).trim().toUpperCase();
       });
       return c;
