@@ -606,8 +606,9 @@
     const mesAct=getMonthBounds(0);
     const s=calcFinanzas(semana), m=calcFinanzas(mesAct);
     // Total global: todos los ingresos históricos menos todos los gastos históricos
-    const todosGastos=finanzas.filter(f=>f.tipo==='gasto').reduce((s,f)=>s+f.monto,0);
-    const todosIngresos=pedidos.reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
+    const CORTE=new Date('2026-06-22T00:00:00');
+    const todosGastos=finanzas.filter(f=>f.tipo==='gasto'&&new Date(f.fecha)>=CORTE).reduce((s,f)=>s+f.monto,0);
+    const todosIngresos=pedidos.filter(p=>new Date(p.fecha)>=CORTE).reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
     const globalTotal=240500+todosIngresos-todosGastos;
 
     const tarjeta=(label,valor,sub,color='text-[#E8E8E8]')=>`
