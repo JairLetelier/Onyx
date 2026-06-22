@@ -783,37 +783,47 @@
     document.querySelector('.tab[data-tab="taller"]')?.classList.add('text-[#E8E8E8]','border-[#E8E8E8]');
     const img = $('dtfImg');
     if(!img) return;
-    let scale=1, lastDist=0, startX=0, startY=0, tx=0, ty=0, dragging=false;
+    let scale=1, lastDist=0, startX=0, startY=0, tx=0, ty=0, dragging=false, lastTap=0;
     const applyTransform=()=>{ img.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`; };
-    img.addEventListener('touchstart', e=>{
+    const resetZoom=()=>{ scale=1; tx=0; ty=0; applyTransform(); };
+
+    // Attach listeners to overlay container so whole screen is draggable/pinchable
+    const ov=$('dtfOverlay');
+
+    ov.addEventListener('touchstart', e=>{
       if(e.touches.length===2){
+        e.preventDefault();
         lastDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-      } else if(e.touches.length===1 && scale>1){
-        dragging=true; startX=e.touches[0].clientX-tx; startY=e.touches[0].clientY-ty;
+        dragging=false;
+      } else if(e.touches.length===1){
+        const now=Date.now();
+        if(now-lastTap<300){ resetZoom(); }
+        lastTap=now;
+        if(scale>1){ dragging=true; startX=e.touches[0].clientX-tx; startY=e.touches[0].clientY-ty; }
       }
-    },{passive:true});
-    img.addEventListener('touchmove', e=>{
+    },{passive:false});
+
+    ov.addEventListener('touchmove', e=>{
       if(e.touches.length===2){
+        e.preventDefault();
         const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-        scale=Math.min(5,Math.max(1,scale*(dist/lastDist)));
+        if(lastDist>0) scale=Math.min(5,Math.max(1,scale*(dist/lastDist)));
         lastDist=dist; applyTransform();
       } else if(dragging && e.touches.length===1){
+        e.preventDefault();
         tx=e.touches[0].clientX-startX; ty=e.touches[0].clientY-startY; applyTransform();
       }
-    },{passive:true});
-    img.addEventListener('touchend', e=>{
-      dragging=false;
-      if(scale<1){ scale=1; tx=0; ty=0; applyTransform(); }
-    });
-    // doble tap para resetear zoom
-    let lastTap=0;
-    img.addEventListener('touchend', e=>{
-      const now=Date.now();
-      if(now-lastTap<300 && e.touches.length===0){ scale=1; tx=0; ty=0; applyTransform(); }
-      lastTap=now;
+    },{passive:false});
+
+    ov.addEventListener('touchend', e=>{
+      if(e.touches.length===0) dragging=false;
+      if(scale<1) resetZoom();
     });
     // ESC en PC
     document.addEventListener('keydown', e=>{ if(e.key==='Escape') window.appCerrarDTF?.(); });
+    // Al abrir overlay, resetear zoom
+    const _origVis=window.appVisualizarDTF;
+    window.appVisualizarDTF=(id,url)=>{ resetZoom(); _origVis(id,url); };
   });
 
   cargar(true);
