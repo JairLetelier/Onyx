@@ -46,6 +46,7 @@
       <button data-tab="taller"   class="tab flex-1 text-center py-4 text-sm font-semibold tracking-wider uppercase text-[#5A5A5A] border-b-2 border-transparent transition-colors duration-150">Taller</button>
       <button data-tab="historial" class="tab flex-1 text-center py-4 text-sm font-semibold tracking-wider uppercase text-[#5A5A5A] border-b-2 border-transparent transition-colors duration-150">Historial</button>
       <button data-tab="stock"    class="tab flex-1 text-center py-4 text-sm font-semibold tracking-wider uppercase text-[#5A5A5A] border-b-2 border-transparent transition-colors duration-150">Stock</button>
+      <button data-tab="finanzas"  class="tab flex-1 text-center py-4 text-sm font-semibold tracking-wider uppercase text-[#5A5A5A] border-b-2 border-transparent transition-colors duration-150">Caja</button>
     </nav>
 
     <main id="main" class="flex-1 p-[18px] md:p-6 pb-36 md:pb-32 overflow-y-auto"></main>
@@ -68,7 +69,10 @@
         <p class="text-xs text-[#5A5A5A] mb-5 leading-relaxed">Pega el mensaje del cliente. Se detectará automáticamente.</p>
 
         <div class="mb-4">
-          <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-2">Mensaje del cliente</label>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A]">Mensaje del cliente</label>
+            <button type="button" id="btnPlantilla" class="text-[10px] font-bold uppercase tracking-wider text-[#5A5A5A] border border-[#2A2A2A] bg-[#1C1C1C] hover:bg-[#2A2A2A] hover:text-[#E8E8E8] px-2.5 py-1 rounded-md transition-colors">+ Plantilla</button>
+          </div>
           <textarea id="pasteBox" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] min-h-[130px] font-mono leading-relaxed focus:outline-none focus:border-[#5A5A5A]" placeholder="Juan Pérez&#10;+56912345678&#10;Av. Pajaritos 1234&#10;Polera: Negro XL"></textarea>
         </div>
 
@@ -78,9 +82,22 @@
 
         <div id="stockIndicator" class="hidden rounded-lg px-3 py-2 text-xs font-semibold mb-4 border flex items-center gap-2"></div>
 
+        <!-- Toggle Retiro / Despacho -->
+        <div class="mb-4">
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-2">Tipo de entrega</label>
+          <div class="flex rounded-lg border border-[#2A2A2A] overflow-hidden bg-[#1C1C1C] p-1 gap-1">
+            <button type="button" id="toggleRetiro" class="flex-1 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all bg-[#E8E8E8] text-[#0A0A0A]">🏠 Retiro</button>
+            <button type="button" id="toggleDespacho" class="flex-1 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all text-[#5A5A5A]">🚚 Despacho</button>
+          </div>
+        </div>
+        <!-- Campo despacho (oculto si retiro) -->
+        <div id="despachoWrap" class="hidden mb-4">
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Costo despacho</label>
+          <input type="number" id="montoDespacho" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="3500" inputmode="numeric">
+        </div>
         <div class="grid grid-cols-2 gap-4 mb-5">
           <div>
-            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Total</label>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Total poleras</label>
             <input type="number" id="montoTotal" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="15000" inputmode="numeric">
           </div>
           <div>
@@ -117,5 +134,18 @@
   </div>
 
   <script src="app.js"></script>
+  <!-- Modal DTF -->
+  <div id="dtfOverlay" class="hidden fixed inset-0 z-50 bg-black/95 flex-col items-center justify-center" onclick="if(event.target===this)appCerrarDTF()">
+    <div class="w-full flex justify-between items-center px-4 py-3 absolute top-0 left-0">
+      <span class="text-[11px] uppercase tracking-widest text-[#5A5A5A] font-bold">Diseño DTF</span>
+      <button onclick="appCerrarDTF()" class="w-9 h-9 rounded-full bg-[#1C1C1C] border border-[#2A2A2A] text-[#9C9C9C] flex items-center justify-center text-lg hover:bg-[#2A2A2A] hover:text-[#E8E8E8] transition-colors">✕</button>
+    </div>
+    <div id="dtfLoading" class="flex flex-col items-center gap-3">
+      <div class="w-8 h-8 border-2 border-[#2A2A2A] border-t-[#E8E8E8] rounded-full animate-spin"></div>
+      <span class="text-[11px] text-[#5A5A5A] uppercase tracking-widest">Cargando diseño...</span>
+    </div>
+    <img id="dtfImg" class="hidden max-w-full max-h-[85vh] object-contain rounded-lg touch-none select-none" style="transform-origin:center center;transition:transform 0.05s;" draggable="false">
+    <p class="absolute bottom-4 text-[10px] text-[#3A3A3A] tracking-wider">Pellizca para hacer zoom · Doble tap para resetear</p>
+  </div>
 </body>
 </html>
