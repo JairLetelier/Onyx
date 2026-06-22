@@ -1,5 +1,5 @@
 (function(){
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzlCo2SCTJ0hAsexiC59SKhJvHg0aQNYMvDvxH-mKW9sGF1XX1VR3jzCGPjF7AOhIjb-g/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwi4XgqSWcPBlaTaj-CR6SmP6rLZV6bCAKRfD6vNkMuVLnCWJSIC7biUBiFqOyMneg1kA/exec';
   let pedidos = [], stock = [], finanzas = [], currentTab = 'taller', historialMonthOffset = 0, editId = null;
 
   // --- Helpers ---
@@ -291,8 +291,7 @@
       currentTab=tab.dataset.tab;
       if(currentTab==='historial') historialMonthOffset=0;
       // Ocultar botón + en stock e historial
-      $('btnNuevoWrap').classList.toggle('hidden', currentTab!=='taller' && currentTab!=='finanzas');
-      if(currentTab==='finanzas') $('btnNuevoWrap').classList.add('hidden');
+      $('btnNuevoWrap').classList.toggle('hidden', currentTab!=='taller');
       render();
     });
   });
@@ -401,25 +400,41 @@
 
   function renderTaller(){
     const pendientes=pedidos.filter(p=>p.estado==='Pendiente');
-    const listaHtml=lista=>lista.length===0
-      ?`<div class="col-span-full text-center py-16 text-[#5A5A5A]"><div class="w-8 h-8 mx-auto mb-3 opacity-40">${STAR}</div><p class="text-sm text-[#9C9C9C] font-semibold">No hay pedidos pendientes.</p></div>`
-      :lista.map(cartaPedido).join('');
+    const conStock=pendientes.filter(p=>!calcSinStock(p));
+    const porComprar=pendientes.filter(p=>calcSinStock(p));
+    const listaHtml=lista=>lista.map(cartaPedido).join('');
+
+    const seccion=(titulo,lista,color='text-[#5A5A5A]')=>lista.length===0?'':
+      `<div class="text-xs tracking-[0.12em] uppercase ${color} mb-3 mt-5 flex items-center gap-2 after:content-[''] after:flex-1 after:h-[1px] after:bg-[#2A2A2A]">${titulo} (${lista.length})</div>
+       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-2">${listaHtml(lista)}</div>`;
+
+    const todoHtml=()=>`
+      ${porComprar.length?`<div class="mb-2 px-4 py-2.5 rounded-xl bg-amber-950/20 border border-amber-800/30 flex items-center gap-2">
+        <span>⚠️</span><span class="text-xs font-bold uppercase tracking-wider text-amber-400">${porComprar.length} pedido${porComprar.length>1?'s':''} esperando stock</span>
+      </div>`:''}
+      ${seccion('🛒 Por Comprar · Falta Stock', porComprar, 'text-amber-500')}
+      ${seccion('⚙️ En Producción', conStock)}
+      ${pendientes.length===0?`<div class="col-span-full text-center py-16 text-[#5A5A5A]"><div class="w-8 h-8 mx-auto mb-3 opacity-40">${STAR}</div><p class="text-sm text-[#9C9C9C] font-semibold">No hay pedidos pendientes.</p></div>`:''}`;
 
     main.innerHTML=renderDashboard()+`
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 my-4">
-        <div class="text-xs tracking-[0.12em] uppercase text-[#5A5A5A] flex items-center gap-2 after:content-[''] after:flex-1 after:h-[1px] after:bg-[#2A2A2A] md:w-1/2">En producción (${pendientes.length})</div>
+        <div class="text-xs tracking-[0.12em] uppercase text-[#5A5A5A] flex items-center gap-2 after:content-[''] after:flex-1 after:h-[1px] after:bg-[#2A2A2A] md:w-1/2">Pedidos (${pendientes.length})</div>
         <div class="relative md:w-1/2">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 opacity-50 text-xs">🔎</span>
           <input type="text" id="buscadorTaller" class="w-full py-2.5 pl-9 pr-4 rounded-lg border border-[#2A2A2A] bg-[#141414] text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="Buscar pedido...">
         </div>
       </div>
-      <div id="tallerList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${listaHtml(pendientes)}</div>`;
+      <div id="tallerList">${todoHtml()}</div>`;
 
     $('buscadorTaller')?.addEventListener('input',e=>{
       const q=e.target.value.trim().toLowerCase();
-      $('tallerList').innerHTML=listaHtml(pendientes.filter(p=>
+      if(!q){ $('tallerList').innerHTML=todoHtml(); return; }
+      const filtrados=pendientes.filter(p=>
         p.cliente.toLowerCase().includes(q)||(p.telefono&&p.telefono.includes(q))||String(p.id).includes(q)
-      ));
+      );
+      $('tallerList').innerHTML=filtrados.length
+        ?`<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${listaHtml(filtrados)}</div>`
+        :`<div class="text-center py-8 text-sm text-[#5A5A5A]">Sin resultados.</div>`;
     });
   }
 
@@ -428,17 +443,29 @@
     const ents=pedidos.filter(p=>p.estado==='Entregado'&&new Date(p.fecha)>=b.start&&new Date(p.fecha)<b.end)
       .sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
     const totalMes=ents.reduce((s,p)=>s+p.montoTotal,0);
-    const itemHtml=p=>`<div class="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 mb-3 flex justify-between items-center hover:border-[#5A5A5A] transition-colors">
-      <div>
-        <div class="font-semibold text-[15px] text-[#E8E8E8]">${esc(p.cliente)}</div>
-        <div class="text-[11px] text-[#5A5A5A] mt-1">N° ${String(p.id).padStart(3,'0')} · ${fechaCorta(p.fecha)}</div>
-        ${(p.color||p.talla)?`<div class="text-[11px] text-[#5A5A5A] mt-1">👕 ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</div>`:''}
-      </div>
-      <div class="text-right flex flex-col items-end">
-        <span class="text-[9px] uppercase tracking-widest font-bold text-emerald-400 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-900/40 mb-1.5">Entregado</span>
-        <div class="font-mono text-sm text-[#9C9C9C]">${fmt(p.montoTotal)}</div>
-      </div>
-    </div>`;
+    const itemHtml=p=>{
+      const deuda=Number(p.porPagar)||0;
+      const desp=Number(p.despacho)||0;
+      return`<div class="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 mb-3 hover:border-[#5A5A5A] transition-colors">
+        <div class="flex justify-between items-start mb-2">
+          <div>
+            <div class="font-semibold text-[15px] text-[#E8E8E8]">${esc(p.cliente)}</div>
+            <div class="text-[11px] text-[#5A5A5A] mt-1">N° ${String(p.id).padStart(3,'0')} · ${fechaCorta(p.fecha)}</div>
+            ${(p.color||p.talla)?`<div class="text-[11px] text-[#5A5A5A] mt-1">👕 ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</div>`:''}
+          </div>
+          <span class="text-[9px] uppercase tracking-widest font-bold text-emerald-400 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-900/40 shrink-0">Entregado</span>
+        </div>
+        <div class="flex gap-3 text-[11px] text-[#5A5A5A] pt-2 border-t border-[#2A2A2A]/50 mt-2">
+          <div>Poleras<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoTotal)}</b></div>
+          ${desp>0?`<div>Despacho<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(desp)}</b></div>`:''}
+          <div>Abono<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoAbonado)}</b></div>
+          <div class="ml-auto text-right">
+            <span class="${deuda>0?'text-red-400':'text-emerald-400'}">${deuda>0?'Deuda':'Pagado'}</span>
+            <b class="block text-[12px] font-mono font-normal mt-0.5 ${deuda>0?'text-red-400':'text-emerald-400'}">${fmt(deuda)}</b>
+          </div>
+        </div>
+      </div>`;
+    };
 
     let html=`<div class="flex items-center justify-between mb-5 py-2 bg-[#141414] rounded-xl border border-[#2A2A2A] px-4">
       <button id="prevMonth" class="w-10 h-10 rounded-full hover:bg-[#2A2A2A] text-[#9C9C9C] flex items-center justify-center text-lg transition-colors">‹</button>
@@ -581,7 +608,7 @@
     // Total global: todos los ingresos históricos menos todos los gastos históricos
     const todosGastos=finanzas.filter(f=>f.tipo==='gasto').reduce((s,f)=>s+f.monto,0);
     const todosIngresos=pedidos.reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
-    const globalTotal=240000-todosGastos;
+    const globalTotal=240000+todosIngresos-todosGastos;
 
     const tarjeta=(label,valor,sub,color='text-[#E8E8E8]')=>`
       <div class="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 relative overflow-hidden">
@@ -599,7 +626,7 @@
         <div class="absolute top-3 right-3 w-6 h-6 opacity-15">${STAR}</div>
         <div class="text-[10px] tracking-widest uppercase ${globalTotal>=0?'text-emerald-400':'text-red-400'} font-bold mb-1">Total Global · Caja</div>
         <div class="font-display text-4xl font-semibold ${globalTotal>=0?'text-emerald-400':'text-red-400'} leading-none">${fmt(globalTotal)}</div>
-        <div class="text-[10px] text-[#5A5A5A] mt-2">Gastos registrados: ${fmt(todosGastos)}</div>
+        <div class="text-[10px] text-[#5A5A5A] mt-2">Ingresos ${fmt(todosIngresos)} · Gastos ${fmt(todosGastos)}</div>
       </div>
 
       <!-- Semana -->
@@ -649,7 +676,7 @@
       <div class="space-y-2 mb-4">
         ${finanzas.length===0
           ? `<div class="text-center py-8 text-[#5A5A5A] text-sm">Sin gastos registrados aún.</div>`
-          : finanzas.slice().reverse().slice(0,10).map((f,i)=>{
+          : finanzas.slice().reverse().map((f,i)=>{
               const idx=finanzas.length-1-i;
               return `<div class="bg-[#141414] border border-[#2A2A2A] rounded-lg px-4 py-3">
                 <div class="flex justify-between items-center">
@@ -660,7 +687,7 @@
                   <div class="flex items-center gap-3">
                     <div class="font-mono text-sm text-red-400">−${fmt(f.monto)}</div>
                     <button onclick="appEditarGasto(${idx})" class="w-7 h-7 rounded-lg bg-[#1C1C1C] border border-[#2A2A2A] text-[#9C9C9C] text-xs flex items-center justify-center hover:bg-[#2A2A2A] hover:text-[#E8E8E8] transition-colors">✏️</button>
-                    <button onclick="appBorrarGasto(${idx})" class="w-7 h-7 rounded-lg bg-red-950/20 border border-red-900/30 text-red-500/70 text-xs flex items-center justify-center hover:bg-red-900/40 hover:text-red-400 transition-colors">✕</button>
+                    <button onclick="appBorrarGasto(${idx},'${f.fecha}')" class="w-7 h-7 rounded-lg bg-red-950/20 border border-red-900/30 text-red-500/70 text-xs flex items-center justify-center hover:bg-red-900/40 hover:text-red-400 transition-colors">✕</button>
                   </div>
                 </div>
                 <div id="editGasto_${idx}" class="hidden mt-3 pt-3 border-t border-[#2A2A2A] flex gap-2">
@@ -719,11 +746,11 @@
     }
   };
 
-  window.appBorrarGasto=async idx=>{
+  window.appBorrarGasto=async(idx,fecha)=>{
     if(!await customConfirm('Eliminar gasto','¿Eliminar este gasto permanentemente?',true)) return;
     const rb=[...finanzas]; finanzas.splice(idx,1); renderFinanzas();
     try{
-      await api('borrarGasto',{idx});
+      await api('borrarGasto',{fecha}); // usa fecha exacta, no índice posicional
       setOnline(true); showToast('Gasto eliminado ✓');
     }catch(e){
       finanzas=rb; setOnline(false); showToast('Error al eliminar. Reintenta.'); renderFinanzas();
@@ -756,7 +783,7 @@
     document.querySelector('.tab[data-tab="taller"]')?.classList.add('text-[#E8E8E8]','border-[#E8E8E8]');
     const img = $('dtfImg');
     if(!img) return;
-    let scale=1, lastDist=0, startX=0, startY=0, tx=0, ty=0, dragging=false, lastTx=0, lastTy=0;
+    let scale=1, lastDist=0, startX=0, startY=0, tx=0, ty=0, dragging=false;
     const applyTransform=()=>{ img.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`; };
     img.addEventListener('touchstart', e=>{
       if(e.touches.length===2){
@@ -774,12 +801,15 @@
         tx=e.touches[0].clientX-startX; ty=e.touches[0].clientY-startY; applyTransform();
       }
     },{passive:true});
-    img.addEventListener('touchend', ()=>{ dragging=false; if(scale<=1){scale=1;tx=0;ty=0;applyTransform();} });
-    // doble tap para resetear
+    img.addEventListener('touchend', e=>{
+      dragging=false;
+      if(scale<1){ scale=1; tx=0; ty=0; applyTransform(); }
+    });
+    // doble tap para resetear zoom
     let lastTap=0;
-    img.addEventListener('touchend', ()=>{
+    img.addEventListener('touchend', e=>{
       const now=Date.now();
-      if(now-lastTap<300){ scale=1;tx=0;ty=0;applyTransform(); }
+      if(now-lastTap<300 && e.touches.length===0){ scale=1; tx=0; ty=0; applyTransform(); }
       lastTap=now;
     });
     // ESC en PC
