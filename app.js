@@ -608,7 +608,7 @@
     // Total global: todos los ingresos históricos menos todos los gastos históricos
     const todosGastos=finanzas.filter(f=>f.tipo==='gasto').reduce((s,f)=>s+f.monto,0);
     const todosIngresos=pedidos.reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
-    const globalTotal=240000+todosIngresos-todosGastos;
+    const globalTotal=240500+todosIngresos-todosGastos;
 
     const tarjeta=(label,valor,sub,color='text-[#E8E8E8]')=>`
       <div class="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 relative overflow-hidden">
