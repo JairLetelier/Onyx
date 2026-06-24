@@ -66,21 +66,58 @@
       <div class="bg-[#141414] w-full max-w-[500px] md:rounded-2xl rounded-t-2xl p-6 pb-8 max-h-[92vh] overflow-y-auto border md:border-[#2A2A2A] border-t border-[#2A2A2A] border-l-0 border-r-0 border-b-0 animate-slideUp">
         <div class="w-9 h-1 bg-[#2A2A2A] rounded-full mx-auto mb-5 md:hidden"></div>
         <h2 id="modalTitle" class="font-display text-2xl font-semibold text-[#E8E8E8] mb-1">Nuevo pedido</h2>
-        <p class="text-xs text-[#5A5A5A] mb-5 leading-relaxed">Pega el mensaje del cliente. Se detectará automáticamente.</p>
+        <p class="text-xs text-[#5A5A5A] mb-4 leading-relaxed">Pega el mensaje del cliente. Se detectará automáticamente.</p>
 
+        <!-- Toggle Polera / Otro -->
         <div class="mb-4">
-          <div class="flex items-center justify-between mb-2">
-            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A]">Mensaje del cliente</label>
-            <button type="button" id="btnPlantilla" class="text-[10px] font-bold uppercase tracking-wider text-[#5A5A5A] border border-[#2A2A2A] bg-[#1C1C1C] hover:bg-[#2A2A2A] hover:text-[#E8E8E8] px-2.5 py-1 rounded-md transition-colors">+ Plantilla</button>
+          <div class="flex rounded-lg border border-[#2A2A2A] overflow-hidden bg-[#1C1C1C] p-1 gap-1">
+            <button type="button" id="toggleTipoPolera" class="flex-1 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all bg-[#E8E8E8] text-[#0A0A0A]">👕 Polera</button>
+            <button type="button" id="toggleTipoOtro" class="flex-1 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all text-[#5A5A5A]">📦 Otro</button>
           </div>
-          <textarea id="pasteBox" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] min-h-[130px] font-mono leading-relaxed focus:outline-none focus:border-[#5A5A5A]" placeholder="Juan Pérez&#10;+56912345678&#10;Av. Pajaritos 1234&#10;Polera: Negro XL"></textarea>
         </div>
 
-        <div id="previewBox" class="bg-[#1C1C1C] border border-[#2A2A2A] rounded-lg p-3 text-xs text-[#5A5A5A] mb-4 leading-relaxed">
-          <span class="italic">Aquí verás los datos detectados.</span>
+        <!-- Bloque Polera: textarea de detección automática -->
+        <div id="bloquePolera">
+          <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A]">Mensaje del cliente</label>
+              <button type="button" id="btnPlantilla" class="text-[10px] font-bold uppercase tracking-wider text-[#5A5A5A] border border-[#2A2A2A] bg-[#1C1C1C] hover:bg-[#2A2A2A] hover:text-[#E8E8E8] px-2.5 py-1 rounded-md transition-colors">+ Plantilla</button>
+            </div>
+            <textarea id="pasteBox" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] min-h-[130px] font-mono leading-relaxed focus:outline-none focus:border-[#5A5A5A]" placeholder="Juan Pérez&#10;+56912345678&#10;Av. Pajaritos 1234&#10;Polera: Negro XL"></textarea>
+          </div>
+
+          <div id="previewBox" class="bg-[#1C1C1C] border border-[#2A2A2A] rounded-lg p-3 text-xs text-[#5A5A5A] mb-4 leading-relaxed">
+            <span class="italic">Aquí verás los datos detectados.</span>
+          </div>
+
+          <div id="stockIndicator" class="hidden rounded-lg px-3 py-2 text-xs font-semibold mb-4 border flex items-center gap-2"></div>
         </div>
 
-        <div id="stockIndicator" class="hidden rounded-lg px-3 py-2 text-xs font-semibold mb-4 border flex items-center gap-2"></div>
+        <!-- Bloque Otro: campos individuales con auto-relleno al pegar texto -->
+        <div id="bloqueOtro" class="hidden">
+          <div class="mb-4">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Nombre del cliente</label>
+            <input type="text" id="otroCliente" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="Juan Pérez">
+          </div>
+          <div class="mb-4">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Teléfono</label>
+            <input type="text" id="otroTelefono" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="+56912345678">
+          </div>
+          <div class="mb-4">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Dirección</label>
+            <input type="text" id="otroDireccion" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="Av. Pajaritos 1234">
+          </div>
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Producto</label>
+              <input type="text" id="otroProducto" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="Rompecabezas">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Tamaño</label>
+              <input type="text" id="otroTamano" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="30x40cm">
+            </div>
+          </div>
+        </div>
 
         <!-- Toggle Retiro / Despacho -->
         <div class="mb-4">
@@ -97,7 +134,7 @@
         </div>
         <div class="grid grid-cols-2 gap-4 mb-5">
           <div>
-            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Total poleras</label>
+            <label id="labelMontoTotal" class="block text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A] mb-1.5">Total poleras</label>
             <input type="number" id="montoTotal" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="15000" inputmode="numeric">
           </div>
           <div>
