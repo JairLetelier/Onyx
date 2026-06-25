@@ -22,6 +22,7 @@
     </svg>
     <p class="text-xs text-[#5A5A5A] tracking-wider" id="loadingText">Sincronizando con Google Sheets...</p>
     <p class="text-[10px] text-[#3A3A3A] tracking-wide mt-1">Te amo Francisca · Filipenses 4:13</p>
+    <button id="btnReintentarLoad" onclick="location.reload()" class="hidden mt-3 px-5 py-2.5 rounded-lg border border-[#2A2A2A] bg-[#141414] text-xs text-[#9C9C9C] hover:text-[#E8E8E8] hover:bg-[#1C1C1C] transition-colors">Recargar página</button>
   </div>
 
   <div class="max-w-7xl w-full mx-auto min-h-screen flex flex-col relative bg-[#0A0A0A] bg-[radial-gradient(ellipse_800px_400px_at_50%_-10%,rgba(255,255,255,0.05),transparent_70%)] shadow-2xl shadow-black/50">
@@ -171,6 +172,18 @@
   </div>
 
   <script src="app.js"></script>
+  <script>
+    // Si tarda más de 5 seg en cargar, mostrar botón de recargar
+    setTimeout(()=>{
+      const ls=document.getElementById('loadingScreen');
+      const btn=document.getElementById('btnReintentarLoad');
+      const txt=document.getElementById('loadingText');
+      if(ls && ls.style.display!=='none' && btn){
+        btn.classList.remove('hidden');
+        if(txt) txt.textContent='Google Sheets está tardando mucho...';
+      }
+    },5000);
+  </script>
   <!-- Modal DTF -->
   <div id="dtfOverlay" class="hidden fixed inset-0 z-50 bg-black/95 flex-col items-center justify-center" onclick="if(event.target===this)appCerrarDTF()">
     <div class="w-full flex justify-between items-center px-4 py-3 absolute top-0 left-0">

@@ -58,16 +58,27 @@
     const opts=action
       ?{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...data})}
       :{method:'GET'};
-    const res=await fetch(API_URL,opts);
-    if(!res.ok) throw new Error('API error');
-    return res.json();
+    // Timeout de 12 segundos para no quedar colgado
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),12000);
+    try{
+      const res=await fetch(API_URL,{...opts,signal:controller.signal});
+      clearTimeout(timer);
+      if(!res.ok) throw new Error('API error '+res.status);
+      return res.json();
+    }catch(e){
+      clearTimeout(timer);
+      if(e.name==='AbortError') throw new Error('Timeout: Google Sheets no respondió');
+      throw e;
+    }
   }
 
   async function cargar(loader){
     const rb=localStorage.getItem('onyx_pedidos');
     const rbOtros=localStorage.getItem('onyx_otros');
-    if(rb){ pedidos=JSON.parse(rb); render(); }
-    if(rbOtros){ otros=JSON.parse(rbOtros); }
+    // Cargar respaldo local primero para mostrar algo de inmediato
+    if(rb){ try{ pedidos=JSON.parse(rb); }catch(e){ pedidos=[]; } render(); }
+    if(rbOtros){ try{ otros=JSON.parse(rbOtros); }catch(e){ otros=[]; } }
     try{
       const data=await api();
       if(data.pedidos){ pedidos=data.pedidos; }
@@ -76,7 +87,12 @@
       if(data.otros){ otros=data.otros; }
       saveLocal();
       setOnline(true);
-    }catch(e){ setOnline(false); }
+    }catch(e){
+      setOnline(false);
+      // Mostrar qué pasó en el texto de carga
+      if(loader){ $('loadingText').textContent='Sin conexión · Mostrando datos guardados'; }
+    }
+    // Siempre ocultar pantalla de carga, haya o no internet
     if(loader) loadingScreen.style.display='none';
     render();
   }
