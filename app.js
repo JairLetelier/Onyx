@@ -1,6 +1,6 @@
 (function(){
-  const API_URL = 'https://script.google.com/macros/s/AKfycbxTCTEFlaCJHvEnvfbbfIXiawFwh_946ERwjPZz4ef4ea-uQVPK6ME300NtI-P3j-Aq/exec';
-  let pedidos = [], stock = [], finanzas = [], otros = [], currentTab = 'taller', historialMonthOffset = 0, editId = null, editTipo = 'polera', modalTipo = 'polera';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwi4XgqSWcPBlaTaj-CR6SmP6rLZV6bCAKRfD6vNkMuVLnCWJSIC7biUBiFqOyMneg1kA/exec';
+  let pedidos = [], stock = [], finanzas = [], currentTab = 'taller', historialMonthOffset = 0, editId = null;
 
   // --- Helpers ---
   const $ = id => document.getElementById(id);
@@ -19,11 +19,6 @@
     porPagarPreviewAmt=$('porPagarPreviewAmt'), stockIndicator=$('stockIndicator');
   // despacho
   const toggleRetiro=$('toggleRetiro'), toggleDespacho=$('toggleDespacho'), despachoWrap=$('despachoWrap'), montoDespacho=$('montoDespacho');
-  // tipo polera/otro
-  const toggleTipoPolera=$('toggleTipoPolera'), toggleTipoOtro=$('toggleTipoOtro'),
-    bloquePolera=$('bloquePolera'), bloqueOtro=$('bloqueOtro'), labelMontoTotal=$('labelMontoTotal'),
-    otroCliente=$('otroCliente'), otroTelefono=$('otroTelefono'), otroDireccion=$('otroDireccion'),
-    otroProducto=$('otroProducto'), otroTamano=$('otroTamano');
 
   // --- UI ---
   function showToast(msg){
@@ -36,7 +31,7 @@
     connBanner.classList.toggle('hidden',online); connBanner.classList.toggle('flex',!online);
   }
 
-  function saveLocal(){ localStorage.setItem('onyx_pedidos',JSON.stringify(pedidos)); localStorage.setItem('onyx_otros',JSON.stringify(otros)); }
+  function saveLocal(){ localStorage.setItem('onyx_pedidos',JSON.stringify(pedidos)); }
 
   function customConfirm(title,msg,danger=false){
     return new Promise(resolve=>{
@@ -58,41 +53,21 @@
     const opts=action
       ?{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...data})}
       :{method:'GET'};
-    // Timeout de 12 segundos para no quedar colgado
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),12000);
-    try{
-      const res=await fetch(API_URL,{...opts,signal:controller.signal});
-      clearTimeout(timer);
-      if(!res.ok) throw new Error('API error '+res.status);
-      return res.json();
-    }catch(e){
-      clearTimeout(timer);
-      if(e.name==='AbortError') throw new Error('Timeout: Google Sheets no respondió');
-      throw e;
-    }
+    const res=await fetch(API_URL,opts);
+    if(!res.ok) throw new Error('API error');
+    return res.json();
   }
 
   async function cargar(loader){
     const rb=localStorage.getItem('onyx_pedidos');
-    const rbOtros=localStorage.getItem('onyx_otros');
-    // Cargar respaldo local primero para mostrar algo de inmediato
-    if(rb){ try{ pedidos=JSON.parse(rb); }catch(e){ pedidos=[]; } render(); }
-    if(rbOtros){ try{ otros=JSON.parse(rbOtros); }catch(e){ otros=[]; } }
+    if(rb){ pedidos=JSON.parse(rb); render(); }
     try{
       const data=await api();
-      if(data.pedidos){ pedidos=data.pedidos; }
+      if(data.pedidos){ pedidos=data.pedidos; saveLocal(); }
       if(data.stock){ stock=data.stock; }
       if(data.finanzas){ finanzas=data.finanzas; }
-      if(data.otros){ otros=data.otros; }
-      saveLocal();
       setOnline(true);
-    }catch(e){
-      setOnline(false);
-      // Mostrar qué pasó en el texto de carga
-      if(loader){ $('loadingText').textContent='Sin conexión · Mostrando datos guardados'; }
-    }
-    // Siempre ocultar pantalla de carga, haya o no internet
+    }catch(e){ setOnline(false); }
     if(loader) loadingScreen.style.display='none';
     render();
   }
@@ -182,10 +157,6 @@
   }
 
   function actualizarPreview(){
-    if(modalTipo==='otro'){
-      // En modo Otro no hay parser de texto libre ni indicador de stock;
-      // solo se recalcula el resumen de "por pagar" más abajo.
-    } else {
     const txt=pasteBox.value.trim();
     if(!txt){
       previewBox.innerHTML='<span class="italic text-[#5A5A5A]">Aquí verás los datos detectados.</span>';
@@ -217,7 +188,6 @@
           <div>👕 Polera <b class="text-[#E8E8E8]">${esc(c.color)||'—'}</b>${c.talla?` · Talla <b class="text-[#E8E8E8]">${esc(c.talla)}</b>`:''}</div>
         </div>`;
     }
-    }
     // por pagar
     const total=parseFloat(montoTotal.value)||0, abonado=parseFloat(montoAbonado.value)||0;
     const despacho=parseFloat(montoDespacho?.value)||0;
@@ -228,106 +198,29 @@
     porPagarPreviewAmt.textContent=fmt(pp);
   }
 
-  // --- Toggle Polera / Otro ---
-  function setModoTipo(tipo){
-    modalTipo=tipo;
-    const esOtro=tipo==='otro';
-    toggleTipoPolera.classList.toggle('bg-[#E8E8E8]',!esOtro);
-    toggleTipoPolera.classList.toggle('text-[#0A0A0A]',!esOtro);
-    toggleTipoPolera.classList.toggle('text-[#5A5A5A]',esOtro);
-    toggleTipoOtro.classList.toggle('bg-[#E8E8E8]',esOtro);
-    toggleTipoOtro.classList.toggle('text-[#0A0A0A]',esOtro);
-    toggleTipoOtro.classList.toggle('text-[#5A5A5A]',!esOtro);
-    bloquePolera.classList.toggle('hidden',esOtro);
-    bloqueOtro.classList.toggle('hidden',!esOtro);
-    labelMontoTotal.textContent=esOtro?'Total':'Total poleras';
-    errorMsg.classList.add('hidden');
-    actualizarPreview();
-  }
-  toggleTipoPolera.addEventListener('click',()=>setModoTipo('polera'));
-  toggleTipoOtro.addEventListener('click',()=>setModoTipo('otro'));
-
-  // Distribuye un texto multilínea pegado entre los campos individuales de "Otro".
-  // Heurística simple por línea: teléfono (dígitos al inicio), dirección (números+letras),
-  // producto/tamaño quedan para que el usuario confirme si no son obvios.
-  function distribuirTextoAOtro(txt){
-    const lineas=txt.trim().split('\n').map(l=>l.trim()).filter(Boolean);
-    const TELEFONO_RE=/^[\+\d][\d\s\-]{6,}/;
-    const usadas=new Set();
-    let nombre='',telefono='',direccion='';
-    lineas.forEach((l,idx)=>{
-      if(!telefono && TELEFONO_RE.test(l)){ telefono=l; usadas.add(idx); return; }
-      if(!direccion && /\d/.test(l) && l.length>5 && !TELEFONO_RE.test(l)){ direccion=cap(l); usadas.add(idx); return; }
-    });
-    lineas.forEach((l,idx)=>{
-      if(!nombre && !usadas.has(idx) && !/\d/.test(l) && l.length>2){ nombre=cap(l); usadas.add(idx); }
-    });
-    if(nombre) otroCliente.value=nombre;
-    if(telefono) otroTelefono.value=telefono;
-    if(direccion) otroDireccion.value=direccion;
-  }
-
-  // Al pegar texto multilínea en cualquier campo del bloque Otro, pregunta si distribuir.
-  [otroCliente,otroTelefono,otroDireccion,otroProducto,otroTamano].forEach(input=>{
-    input?.addEventListener('paste',e=>{
-      const texto=(e.clipboardData||window.clipboardData)?.getData('text')||'';
-      if(texto.includes('\n')){
-        e.preventDefault();
-        customConfirm('Texto pegado detectado','¿Quieres distribuir automáticamente este texto a todos los campos?',false)
-          .then(si=>{ if(si) distribuirTextoAOtro(texto); else input.value=texto.split('\n')[0]; actualizarPreview(); });
-      }
-    });
-  });
-
-
   ['input','change'].forEach(ev=>{
     pasteBox.addEventListener(ev,actualizarPreview);
     montoTotal.addEventListener(ev,actualizarPreview);
     montoAbonado.addEventListener(ev,actualizarPreview);
     montoDespacho?.addEventListener(ev,actualizarPreview);
-    otroCliente?.addEventListener(ev,actualizarPreview);
-    otroTelefono?.addEventListener(ev,actualizarPreview);
-    otroDireccion?.addEventListener(ev,actualizarPreview);
-    otroProducto?.addEventListener(ev,actualizarPreview);
-    otroTamano?.addEventListener(ev,actualizarPreview);
   });
 
   // --- Modal ---
   const cerrarSheet=()=>{ sheet.classList.remove('flex'); sheet.classList.add('hidden'); };
 
-  const abrirModal=(id=null,tipo='polera')=>{
-    editId=id; editTipo=tipo; errorMsg.classList.add('hidden'); stockIndicator.classList.add('hidden');
-    const bloquearToggleTipo=!!id;
-    toggleTipoPolera.disabled=bloquearToggleTipo; toggleTipoOtro.disabled=bloquearToggleTipo;
-    toggleTipoPolera.classList.toggle('opacity-50',bloquearToggleTipo);
-    toggleTipoOtro.classList.toggle('opacity-50',bloquearToggleTipo);
-    toggleTipoPolera.style.pointerEvents=bloquearToggleTipo?'none':'';
-    toggleTipoOtro.style.pointerEvents=bloquearToggleTipo?'none':'';
+  const abrirModal=(id=null)=>{
+    editId=id; errorMsg.classList.add('hidden'); stockIndicator.classList.add('hidden');
     if(id){
       modalTitle.textContent="Editar pedido";
-      if(tipo==='otro'){
-        const p=otros.find(x=>x.id===id);
-        setModoTipo('otro');
-        otroCliente.value=p.cliente||''; otroTelefono.value=p.telefono||'';
-        otroDireccion.value=p.direccion||''; otroProducto.value=p.producto||''; otroTamano.value=p.tamano||'';
-        montoTotal.value=p.montoTotal; montoAbonado.value=p.montoAbonado;
-        const dep=Number(p.despacho)||0;
-        if(dep>0){ setModoEnvio('despacho'); montoDespacho.value=dep; }
-        else { setModoEnvio('retiro'); }
-      } else {
-        const p=pedidos.find(x=>x.id===id);
-        setModoTipo('polera');
-        pasteBox.value=`Nombre: ${p.cliente}\nTeléfono: ${p.telefono||''}\nDirección: ${p.direccion||''}\nColor: ${p.color||''}\nTalla: ${p.talla||''}`;
-        montoTotal.value=p.montoTotal; montoAbonado.value=p.montoAbonado;
-        const dep=Number(p.despacho)||0;
-        if(dep>0){ setModoEnvio('despacho'); montoDespacho.value=dep; }
-        else { setModoEnvio('retiro'); }
-      }
+      const p=pedidos.find(x=>x.id===id);
+      pasteBox.value=`Nombre: ${p.cliente}\nTeléfono: ${p.telefono||''}\nDirección: ${p.direccion||''}\nColor: ${p.color||''}\nTalla: ${p.talla||''}`;
+      montoTotal.value=p.montoTotal; montoAbonado.value=p.montoAbonado;
+      const dep=Number(p.despacho)||0;
+      if(dep>0){ setModoEnvio('despacho'); montoDespacho.value=dep; }
+      else { setModoEnvio('retiro'); }
     } else {
       modalTitle.textContent="Nuevo pedido";
       pasteBox.value=montoTotal.value=montoAbonado.value='';
-      otroCliente.value=otroTelefono.value=otroDireccion.value=otroProducto.value=otroTamano.value='';
-      setModoTipo('polera');
       setModoEnvio('retiro');
     }
     actualizarPreview();
@@ -359,48 +252,20 @@
     const pos=pasteBox.value.indexOf('\n'); pasteBox.setSelectionRange(pos,pos);
     actualizarPreview();
   });
-  window.appEditarPedido=id=>abrirModal(id,'polera');
-  window.appEditarOtro=id=>abrirModal(id,'otro');
+  window.appEditarPedido=abrirModal;
   $('btnCancelar').addEventListener('click',cerrarSheet);
   sheet.addEventListener('click',e=>{ if(e.target===sheet) cerrarSheet(); });
 
   // --- Guardar ---
   btnGuardar.addEventListener('click',async()=>{
-    const despacho=parseFloat(montoDespacho?.value)||0;
-    const total=parseFloat(montoTotal.value), abonado=parseFloat(montoAbonado.value)||0;
-
-    if(modalTipo==='otro'){
-      const cliente=cap((otroCliente.value||'').trim());
-      const producto=(otroProducto.value||'').trim();
-      if(!cliente||isNaN(total)){
-        errorMsg.textContent=!cliente?'Ingresa el nombre del cliente.':'Ingresa el monto total.';
-        errorMsg.classList.remove('hidden'); return;
-      }
-      btnGuardar.disabled=true; btnGuardar.textContent='Guardando...';
-      const payload={cliente,telefono:(otroTelefono.value||'').trim(),direccion:(otroDireccion.value||'').trim(),
-        producto,tamano:(otroTamano.value||'').trim(),montoTotal:total,montoAbonado:abonado,despacho,porPagar:total+despacho-abonado};
-      try{
-        if(editId){
-          await api('updateOtro',{id:editId,...payload});
-          showToast('Pedido actualizado ✓');
-        } else {
-          payload.fecha=new Date().toISOString(); payload.estado='Pendiente';
-          await api('createOtro',{pedido:payload});
-          showToast('Pedido guardado ✓');
-        }
-        setOnline(true); cerrarSheet(); await cargar(false);
-      }catch(e){
-        setOnline(false); errorMsg.textContent='Error de conexión. Intenta de nuevo.'; errorMsg.classList.remove('hidden');
-      }finally{ btnGuardar.disabled=false; btnGuardar.textContent='Guardar Pedido'; }
-      return;
-    }
-
     const c=parsearTexto(pasteBox.value.trim());
+    const total=parseFloat(montoTotal.value), abonado=parseFloat(montoAbonado.value)||0;
     if(!c.cliente||isNaN(total)){
       errorMsg.textContent=!c.cliente?'No se detectó el nombre del cliente.':'Ingresa el monto total.';
       errorMsg.classList.remove('hidden'); return;
     }
     btnGuardar.disabled=true; btnGuardar.textContent='Guardando...';
+    const despacho=parseFloat(montoDespacho?.value)||0;
     const payload={cliente:c.cliente,telefono:c.telefono,direccion:c.direccion,
       color:c.color,talla:c.talla,montoTotal:total,montoAbonado:abonado,despacho:despacho,porPagar:total+despacho-abonado};
     try{
@@ -447,22 +312,6 @@
     catch(e){ setOnline(false); pedidos=rb; saveLocal(); showToast('Error. Reintenta.'); render(); }
   };
 
-  // --- Acciones pedidos "Otros" — mismo flujo que poleras, sin lógica de stock ---
-  window.appMarcarEntregadoOtro=async id=>{
-    if(!await customConfirm('Entregar pedido','¿Marcar como entregado? Se moverá al historial.',false)) return;
-    const p=otros.find(x=>x.id===id); if(!p) return;
-    p.estado='Entregado'; saveLocal(); render();
-    try{ await api('updateEstadoOtro',{id,estado:'Entregado'}); setOnline(true); showToast('Pedido entregado'); await cargar(false); }
-    catch(e){ setOnline(false); p.estado='Pendiente'; saveLocal(); showToast('Error. Reintenta.'); render(); }
-  };
-
-  window.appEliminarOtro=async id=>{
-    if(!await customConfirm('Eliminar pedido','¿Eliminar permanentemente? No se puede deshacer.',true)) return;
-    const rb=otros; otros=otros.filter(x=>x.id!==id); saveLocal(); render();
-    try{ await api('deleteOtro',{id}); setOnline(true); showToast('Pedido eliminado'); await cargar(false); }
-    catch(e){ setOnline(false); otros=rb; saveLocal(); showToast('Error. Reintenta.'); render(); }
-  };
-
   // --- Render helpers ---
   const getMonthBounds=offset=>{
     const now=new Date(), t=new Date(now.getFullYear(),now.getMonth()+offset,1);
@@ -479,8 +328,7 @@
   }
 
   function renderDashboard(){
-    const b=getMonthBounds(0);
-    const pAct=pedidos.concat(otros).filter(p=>{ const f=new Date(p.fecha); return f>=b.start&&f<b.end; });
+    const b=getMonthBounds(0), pAct=pedidos.filter(p=>{ const f=new Date(p.fecha); return f>=b.start&&f<b.end; });
     const ingresos=pAct.reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
     const ventas=pAct.reduce((s,p)=>s+p.montoTotal,0);
     return`<div class="mb-4">
@@ -512,15 +360,7 @@
   }
 
   function cartaPedido(p){
-    const esOtro=p.tipo==='otro';
-    const debe=p.porPagar>0, sinStock=!esOtro&&calcSinStock(p);
-    const fnEntregar=esOtro?'appMarcarEntregadoOtro':'appMarcarEntregado';
-    const fnEditar=esOtro?'appEditarOtro':'appEditarPedido';
-    const fnEliminar=esOtro?'appEliminarOtro':'appEliminarPedido';
-    const etiquetaMonto=esOtro?'Total':'Poleras';
-    const chip=esOtro
-      ?((p.producto||p.tamano)?`<span class="text-xs px-3 py-1.5 rounded-md border font-medium tracking-wide bg-[#1C1C1C] border-[#2A2A2A] text-[#E8E8E8]">📦 ${p.producto?esc(cap(p.producto)):''}${p.tamano?` · ${esc(p.tamano)}`:''}</span>`:'')
-      :((p.color||p.talla)?`<span class="text-xs px-3 py-1.5 rounded-md border font-medium tracking-wide ${sinStock?'bg-amber-950/20 border-amber-800/40 text-amber-300':'bg-[#1C1C1C] border-[#2A2A2A] text-[#E8E8E8]'}">👕 Polera ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</span>`:'');
+    const debe=p.porPagar>0, sinStock=calcSinStock(p);
     return`<div class="bg-[#141414] border ${sinStock?'border-amber-800/50':'border-[#2A2A2A]'} rounded-xl relative overflow-hidden flex flex-col hover:border-[#5A5A5A] transition-colors">
       <div class="absolute top-0 left-0 bottom-0 w-[3px] ${sinStock?'bg-amber-500':debe?'bg-red-600':'bg-emerald-600'}"></div>
       ${sinStock?`<div class="bg-amber-950/30 border-b border-amber-800/30 px-4 py-2 flex items-center gap-2"><span>⚠️</span><span class="text-[10px] font-bold uppercase tracking-widest text-amber-400">Por Comprar · Falta Stock</span></div>`:''}
@@ -534,12 +374,12 @@
           <div class="text-[10px] text-[#5A5A5A] text-right whitespace-nowrap">${fechaCorta(p.fecha)}</div>
         </div>
         <div class="flex flex-wrap gap-1.5 my-3">
-          ${chip}
+          ${(p.color||p.talla)?`<span class="text-xs px-3 py-1.5 rounded-md border font-medium tracking-wide ${sinStock?'bg-amber-950/20 border-amber-800/40 text-amber-300':'bg-[#1C1C1C] border-[#2A2A2A] text-[#E8E8E8]'}">👕 Polera ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</span>`:''}
         </div>
         ${p.direccion?`<a href="https://maps.google.com/?q=${encodeURIComponent(p.direccion)}" target="_blank" rel="noopener" class="text-[12.5px] text-[#9C9C9C] my-2 flex gap-2 items-start bg-[#1C1C1C] p-2.5 rounded-lg border border-[#2A2A2A]/50 hover:border-[#5A5A5A] hover:text-[#E8E8E8] transition-colors active:scale-[0.99]"><span>📍</span><span class="flex-1">${esc(p.direccion)}</span><span class="text-[10px] text-blue-400 self-center whitespace-nowrap">Ver mapa ›</span></a>`:''}
         <div class="mt-auto pt-4 border-t border-[#2A2A2A]">
           <div class="flex gap-3 text-[11px] text-[#5A5A5A] mb-3">
-            <div>${etiquetaMonto}<b class="block text-[13px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoTotal)}</b></div>
+            <div>Poleras<b class="block text-[13px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoTotal)}</b></div>
             ${Number(p.despacho)>0?`<div>Despacho<b class="block text-[13px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.despacho)}</b></div>`:'<div>🏠 Retiro<b class="block text-[13px] text-[#9C9C9C] font-mono font-normal mt-0.5">—</b></div>'}
             <div>Abono<b class="block text-[13px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoAbonado)}</b></div>
           </div>
@@ -550,17 +390,16 @@
         </div>
         ${p.imagenUrl?`<button class="w-full mt-3 bg-[#1C1C1C] border border-[#2A2A2A] rounded-lg py-2.5 text-xs font-bold tracking-widest uppercase text-[#9C9C9C] hover:bg-[#2A2A2A] hover:text-[#E8E8E8] transition-colors flex items-center justify-center gap-2" onclick="appVisualizarDTF(${p.id},'${p.imagenUrl}')">🖼 Visualizar diseño</button>`:''}
         <div class="flex gap-2 mt-3 pt-4 border-t border-[#2A2A2A]/50">
-          <button class="flex-1 bg-[#E8E8E8] text-[#0A0A0A] py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase active:scale-[0.98] hover:bg-white transition-all" onclick="${fnEntregar}(${p.id})">Entregar</button>
-          <button class="w-12 bg-[#1C1C1C] border border-[#2A2A2A] rounded-lg text-[#9C9C9C] text-sm flex items-center justify-center hover:bg-[#2A2A2A] transition-colors" onclick="${fnEditar}(${p.id})">✏️</button>
-          <button class="w-12 bg-red-950/20 border border-red-900/30 rounded-lg text-red-500/70 text-sm flex items-center justify-center hover:bg-red-900/40 hover:text-red-400 transition-colors" onclick="${fnEliminar}(${p.id})">✕</button>
+          <button class="flex-1 bg-[#E8E8E8] text-[#0A0A0A] py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase active:scale-[0.98] hover:bg-white transition-all" onclick="appMarcarEntregado(${p.id})">Entregar</button>
+          <button class="w-12 bg-[#1C1C1C] border border-[#2A2A2A] rounded-lg text-[#9C9C9C] text-sm flex items-center justify-center hover:bg-[#2A2A2A] transition-colors" onclick="appEditarPedido(${p.id})">✏️</button>
+          <button class="w-12 bg-red-950/20 border border-red-900/30 rounded-lg text-red-500/70 text-sm flex items-center justify-center hover:bg-red-900/40 hover:text-red-400 transition-colors" onclick="appEliminarPedido(${p.id})">✕</button>
         </div>
       </div>
     </div>`;
   }
 
   function renderTaller(){
-    const pendientes=pedidos.concat(otros).filter(p=>p.estado==='Pendiente')
-      .sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+    const pendientes=pedidos.filter(p=>p.estado==='Pendiente');
     const conStock=pendientes.filter(p=>!calcSinStock(p));
     const porComprar=pendientes.filter(p=>calcSinStock(p));
     const listaHtml=lista=>lista.map(cartaPedido).join('');
@@ -601,27 +440,23 @@
 
   function renderHistorial(){
     const b=getMonthBounds(historialMonthOffset);
-    const ents=pedidos.concat(otros).filter(p=>p.estado==='Entregado'&&new Date(p.fecha)>=b.start&&new Date(p.fecha)<b.end)
+    const ents=pedidos.filter(p=>p.estado==='Entregado'&&new Date(p.fecha)>=b.start&&new Date(p.fecha)<b.end)
       .sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
     const totalMes=ents.reduce((s,p)=>s+p.montoTotal,0);
     const itemHtml=p=>{
       const deuda=Number(p.porPagar)||0;
       const desp=Number(p.despacho)||0;
-      const esOtro=p.tipo==='otro';
-      const chip=esOtro
-        ?((p.producto||p.tamano)?`<div class="text-[11px] text-[#5A5A5A] mt-1">📦 ${p.producto?esc(cap(p.producto)):''}${p.tamano?` · ${esc(p.tamano)}`:''}</div>`:'')
-        :((p.color||p.talla)?`<div class="text-[11px] text-[#5A5A5A] mt-1">👕 ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</div>`:'');
       return`<div class="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 mb-3 hover:border-[#5A5A5A] transition-colors">
         <div class="flex justify-between items-start mb-2">
           <div>
             <div class="font-semibold text-[15px] text-[#E8E8E8]">${esc(p.cliente)}</div>
             <div class="text-[11px] text-[#5A5A5A] mt-1">N° ${String(p.id).padStart(3,'0')} · ${fechaCorta(p.fecha)}</div>
-            ${chip}
+            ${(p.color||p.talla)?`<div class="text-[11px] text-[#5A5A5A] mt-1">👕 ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</div>`:''}
           </div>
           <span class="text-[9px] uppercase tracking-widest font-bold text-emerald-400 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-900/40 shrink-0">Entregado</span>
         </div>
         <div class="flex gap-3 text-[11px] text-[#5A5A5A] pt-2 border-t border-[#2A2A2A]/50 mt-2">
-          <div>${esOtro?'Total':'Poleras'}<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoTotal)}</b></div>
+          <div>Poleras<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoTotal)}</b></div>
           ${desp>0?`<div>Despacho<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(desp)}</b></div>`:''}
           <div>Abono<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoAbonado)}</b></div>
           <div class="ml-auto text-right">
@@ -758,14 +593,12 @@
 
   function calcFinanzas(rango){
     const gastos=finanzas.filter(f=>f.tipo==='gasto'&&new Date(f.fecha)>=rango.start&&new Date(f.fecha)<rango.end);
-    const totalGasto=gastos.reduce((s,f)=>s+f.monto,0);
-    // Ingresos desde pedidos de poleras + otros (montoAbonado si pendiente, montoTotal si entregado)
-    const ingresosPoleras=pedidos.filter(p=>new Date(p.fecha)>=rango.start&&new Date(p.fecha)<rango.end)
+    const poleras=gastos.filter(f=>f.categoria==='poleras').reduce((s,f)=>s+f.monto,0);
+    const dtf=gastos.filter(f=>f.categoria==='dtf').reduce((s,f)=>s+f.monto,0);
+    // Ingresos desde pedidos (montoAbonado si pendiente, montoTotal si entregado)
+    const ingresos=pedidos.filter(p=>new Date(p.fecha)>=rango.start&&new Date(p.fecha)<rango.end)
       .reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
-    const ingresosOtros=otros.filter(p=>new Date(p.fecha)>=rango.start&&new Date(p.fecha)<rango.end)
-      .reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
-    const ingresos=ingresosPoleras+ingresosOtros;
-    return{totalGasto,ingresos,balance:ingresos-totalGasto};
+    return{poleras,dtf,totalGasto:poleras+dtf,ingresos,balance:ingresos-(poleras+dtf)};
   }
 
   function renderFinanzas(){
@@ -775,9 +608,7 @@
     // Total global: todos los ingresos históricos menos todos los gastos históricos
     const CORTE=new Date('2026-06-22T00:00:00');
     const todosGastos=finanzas.filter(f=>f.tipo==='gasto'&&new Date(f.fecha)>=CORTE).reduce((s,f)=>s+f.monto,0);
-    const todosIngresosPoleras=pedidos.filter(p=>new Date(p.fecha)>=CORTE).reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
-    const todosIngresosOtros=otros.filter(p=>new Date(p.fecha)>=CORTE).reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
-    const todosIngresos=todosIngresosPoleras+todosIngresosOtros;
+    const todosIngresos=pedidos.filter(p=>new Date(p.fecha)>=CORTE).reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
     const globalTotal=240500+todosIngresos-todosGastos;
 
     const tarjeta=(label,valor,sub,color='text-[#E8E8E8]')=>`
@@ -802,7 +633,11 @@
       <!-- Semana -->
       ${separador('📅 Esta semana')}
       <div class="grid grid-cols-2 gap-3 mb-3">
-        ${tarjeta('Invertido 📉',s.totalGasto,'Gastos de la semana',s.totalGasto>0?'text-red-400':'text-[#E8E8E8]')}
+        ${tarjeta('Poleras 📉',s.poleras,'Inversión en prendas','text-red-400')}
+        ${tarjeta('DTF 📉',s.dtf,'Inversión en láminas','text-red-400')}
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        ${tarjeta('Total Invertido',s.totalGasto,'Poleras + DTF',s.totalGasto>0?'text-red-400':'text-[#E8E8E8]')}
         ${tarjeta('Ganado 📈',s.ingresos,'Ingresos de pedidos','text-emerald-400')}
       </div>
       <div class="bg-[#141414] border ${s.balance>=0?'border-emerald-900/30':'border-red-900/30'} rounded-xl p-4 mb-2">
@@ -814,7 +649,11 @@
       <!-- Mes -->
       ${separador('🗓️ Este mes · '+MESES[new Date().getMonth()])}
       <div class="grid grid-cols-2 gap-3 mb-3">
-        ${tarjeta('Invertido 📉',m.totalGasto,'Gastos del mes',m.totalGasto>0?'text-red-400':'text-[#E8E8E8]')}
+        ${tarjeta('Poleras 📉',m.poleras,'Inversión en prendas','text-red-400')}
+        ${tarjeta('DTF 📉',m.dtf,'Inversión en láminas','text-red-400')}
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        ${tarjeta('Total Invertido',m.totalGasto,'Poleras + DTF',m.totalGasto>0?'text-red-400':'text-[#E8E8E8]')}
         ${tarjeta('Ganado 📈',m.ingresos,'Ingresos del mes','text-emerald-400')}
       </div>
       <div class="bg-[#141414] border ${m.balance>=0?'border-emerald-900/30':'border-red-900/30'} rounded-xl p-4 mb-5">
@@ -826,9 +665,11 @@
       <!-- Formulario registrar gasto -->
       ${separador('➕ Registrar gasto')}
       <div class="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 mb-4">
-        <input type="text" id="gastoDescripcion" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A] mb-3" placeholder="Descripción (ej: Tela negra, láminas DTF, envío...)">
         <input type="number" id="gastoMonto" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A] mb-3" placeholder="Monto del gasto (ej: 20000)" inputmode="numeric">
-        <button onclick="appRegistrarGasto()" class="w-full py-3 rounded-lg bg-[#1C1C1C] border border-[#2A2A2A] text-xs font-bold uppercase tracking-wider text-[#9C9C9C] hover:bg-[#2A2A2A] hover:text-[#E8E8E8] transition-colors active:scale-95">− Registrar Gasto</button>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="appRegistrarGasto('poleras')" class="py-3 rounded-lg bg-[#1C1C1C] border border-[#2A2A2A] text-xs font-bold uppercase tracking-wider text-[#9C9C9C] hover:bg-[#2A2A2A] hover:text-[#E8E8E8] transition-colors active:scale-95">− Gasto Poleras</button>
+          <button onclick="appRegistrarGasto('dtf')" class="py-3 rounded-lg bg-[#1C1C1C] border border-[#2A2A2A] text-xs font-bold uppercase tracking-wider text-[#9C9C9C] hover:bg-[#2A2A2A] hover:text-[#E8E8E8] transition-colors active:scale-95">− Gasto DTF</button>
+        </div>
       </div>
 
       <!-- Historial de gastos recientes -->
@@ -838,12 +679,10 @@
           ? `<div class="text-center py-8 text-[#5A5A5A] text-sm">Sin gastos registrados aún.</div>`
           : finanzas.slice().reverse().map((f,i)=>{
               const idx=finanzas.length-1-i;
-              const esLegacy=f.categoria==='poleras'||f.categoria==='dtf';
-              const etiqueta=esLegacy?(f.categoria==='poleras'?'👕 Poleras':'🖨 DTF'):(esc(f.categoria)||'Gasto');
               return `<div class="bg-[#141414] border border-[#2A2A2A] rounded-lg px-4 py-3">
                 <div class="flex justify-between items-center">
                   <div>
-                    <span class="text-[10px] uppercase tracking-wider font-bold ${esLegacy?(f.categoria==='poleras'?'text-blue-400':'text-purple-400'):'text-[#9C9C9C]'}">${etiqueta}</span>
+                    <span class="text-[10px] uppercase tracking-wider font-bold ${f.categoria==='poleras'?'text-blue-400':'text-purple-400'}">${f.categoria==='poleras'?'👕 Poleras':'🖨 DTF'}</span>
                     <div class="text-[11px] text-[#5A5A5A] mt-0.5">${new Date(f.fecha).toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'2-digit'})}</div>
                   </div>
                   <div class="flex items-center gap-3">
@@ -853,8 +692,11 @@
                   </div>
                 </div>
                 <div id="editGasto_${idx}" class="hidden mt-3 pt-3 border-t border-[#2A2A2A] flex gap-2">
-                  <input type="text" id="editGastoDesc_${idx}" value="${esc(f.categoria)}" class="flex-1 border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-2 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="Descripción">
-                  <input type="number" id="editGastoMonto_${idx}" value="${f.monto}" class="w-24 border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-2 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" inputmode="numeric">
+                  <input type="number" id="editGastoMonto_${idx}" value="${f.monto}" class="flex-1 border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-2 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" inputmode="numeric">
+                  <select id="editGastoCat_${idx}" class="border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-2 text-xs text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]">
+                    <option value="poleras" ${f.categoria==='poleras'?'selected':''}>👕 Poleras</option>
+                    <option value="dtf" ${f.categoria==='dtf'?'selected':''}>🖨 DTF</option>
+                  </select>
                   <button onclick="appGuardarEdicionGasto(${idx})" class="px-3 py-2 rounded-lg bg-[#E8E8E8] text-[#0A0A0A] text-xs font-bold">✓</button>
                 </div>
               </div>`;
@@ -865,20 +707,17 @@
     main.innerHTML=html;
   }
 
-  window.appRegistrarGasto=async()=>{
-    const descInput=$('gastoDescripcion');
-    const montoInput=$('gastoMonto');
-    const descripcion=(descInput?.value||'').trim();
-    const monto=parseFloat(montoInput?.value);
-    if(!descripcion){ showToast('Describe el gasto'); return; }
+  window.appRegistrarGasto=async(categoria)=>{
+    const input=$('gastoMonto');
+    const monto=parseFloat(input?.value);
     if(!monto||monto<=0){ showToast('Ingresa un monto válido'); return; }
-    const gasto={fecha:new Date().toISOString(),tipo:'gasto',categoria:descripcion,monto};
+    const gasto={fecha:new Date().toISOString(),tipo:'gasto',categoria,monto};
     finanzas.push(gasto);
     renderFinanzas();
     try{
       await api('registrarGasto',{gasto});
       setOnline(true);
-      showToast(`Gasto "${descripcion}" registrado ✓`);
+      showToast(`Gasto ${categoria==='poleras'?'Poleras':'DTF'} registrado ✓`);
     }catch(e){
       finanzas.pop();
       setOnline(false);
@@ -895,14 +734,13 @@
 
   window.appGuardarEdicionGasto=async idx=>{
     const monto=parseFloat($(`editGastoMonto_${idx}`)?.value);
-    const descripcion=($(`editGastoDesc_${idx}`)?.value||'').trim();
-    if(!descripcion){ showToast('Describe el gasto'); return; }
+    const cat=$(`editGastoCat_${idx}`)?.value;
     if(!monto||monto<=0){ showToast('Monto inválido'); return; }
     const anterior={...finanzas[idx]};
-    finanzas[idx]={...finanzas[idx],monto,categoria:descripcion};
+    finanzas[idx]={...finanzas[idx],monto,categoria:cat};
     renderFinanzas();
     try{
-      await api('editarGasto',{idx,monto,categoria:descripcion,fecha:anterior.fecha});
+      await api('editarGasto',{idx,monto,categoria:cat,fecha:anterior.fecha});
       setOnline(true); showToast('Gasto actualizado ✓');
     }catch(e){
       finanzas[idx]=anterior; setOnline(false); showToast('Error al guardar. Reintenta.'); renderFinanzas();
