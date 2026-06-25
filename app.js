@@ -1,6 +1,7 @@
 (function(){
   const API_URL = 'https://script.google.com/macros/s/AKfycbwi4XgqSWcPBlaTaj-CR6SmP6rLZV6bCAKRfD6vNkMuVLnCWJSIC7biUBiFqOyMneg1kA/exec';
   let pedidos = [], stock = [], finanzas = [], currentTab = 'taller', historialMonthOffset = 0, editId = null;
+  let tipoPedidoActual = 'polera'; // 'polera' | 'otro' — controla el modal de Nuevo/Editar pedido
 
   // --- Helpers ---
   const $ = id => document.getElementById(id);
@@ -19,6 +20,8 @@
     porPagarPreviewAmt=$('porPagarPreviewAmt'), stockIndicator=$('stockIndicator');
   // despacho
   const toggleRetiro=$('toggleRetiro'), toggleDespacho=$('toggleDespacho'), despachoWrap=$('despachoWrap'), montoDespacho=$('montoDespacho');
+  // tipo de pedido: polera / otro
+  const toggleTipoPolera=$('toggleTipoPolera'), toggleTipoOtro=$('toggleTipoOtro'), labelMontoTotal=$('labelMontoTotal');
 
   // --- UI ---
   function showToast(msg){
@@ -77,7 +80,7 @@
   // --- Parser de texto libre ---
   // Detecta campos con etiqueta (Nombre: Juan) o sin etiqueta por posición
   function parsearTexto(txt){
-    const c={cliente:'',telefono:'',direccion:'',color:'',talla:''};
+    const c={cliente:'',telefono:'',direccion:'',color:'',talla:'',producto:''};
     if(!txt.trim()) return c;
 
     const lineas=txt.trim().split('\n').map(l=>l.trim()).filter(Boolean);
@@ -107,6 +110,7 @@
         }
         else if(k.includes('color')) c.color=v;
         else if(k.includes('talla')) c.talla=l.slice(i+1).trim().toUpperCase();
+        else if(k.includes('producto')||k.includes('articulo')||k.includes('artículo')||k.includes('item')) c.producto=v;
       });
       return c;
     }
@@ -144,8 +148,16 @@
       }
     });
 
-    // Segunda pasada: si color sigue vacío, buscar en lineas que no sean nombre/tel/dir/talla
-    if(!c.color){
+    // Segunda pasada: si falta el campo de producto/color, buscar en líneas que no sean nombre/tel/dir/talla
+    if(tipoPedidoActual==='otro'){
+      if(!c.producto){
+        lineas.forEach(l=>{
+          const lu=l.toUpperCase().trim();
+          if(l===c.cliente||l===c.telefono||l===c.direccion||lu===c.talla) return;
+          if(!/\d/.test(l) && l.length>1 && !c.producto) c.producto=cap(l);
+        });
+      }
+    } else if(!c.color){
       lineas.forEach(l=>{
         const lu=l.toUpperCase().trim();
         if(l===c.cliente||l===c.telefono||l===c.direccion||lu===c.talla) return;
@@ -158,13 +170,14 @@
 
   function actualizarPreview(){
     const txt=pasteBox.value.trim();
+    const esOtro=tipoPedidoActual==='otro';
     if(!txt){
       previewBox.innerHTML='<span class="italic text-[#5A5A5A]">Aquí verás los datos detectados.</span>';
       stockIndicator.classList.add('hidden');
     } else {
       const c=parsearTexto(txt);
-      // indicador de stock
-      if(c.color||c.talla){
+      // indicador de stock (no aplica a categoría "Otros": no se cruza con Stock)
+      if(!esOtro && (c.color||c.talla)){
         const item=stock.find(s=>norm(s.color)===norm(c.color)&&norm(s.talla)===norm(c.talla));
         const cant=item?Number(item.cantidad):-1;
         stockIndicator.classList.remove('hidden');
@@ -185,7 +198,9 @@
         <div class="space-y-1">
           <div>👤 <b class="text-[#E8E8E8]">${esc(c.cliente)||'—'}</b>${c.telefono?` · 📱 ${esc(c.telefono)}`:''}</div>
           ${c.direccion?`<div>📍 ${esc(c.direccion)}</div>`:''}
-          <div>👕 Polera <b class="text-[#E8E8E8]">${esc(c.color)||'—'}</b>${c.talla?` · Talla <b class="text-[#E8E8E8]">${esc(c.talla)}</b>`:''}</div>
+          ${esOtro
+            ?`<div>🎁 Producto <b class="text-[#E8E8E8]">${esc(c.producto)||'—'}</b></div>`
+            :`<div>👕 Polera <b class="text-[#E8E8E8]">${esc(c.color)||'—'}</b>${c.talla?` · Talla <b class="text-[#E8E8E8]">${esc(c.talla)}</b>`:''}</div>`}
         </div>`;
     }
     // por pagar
@@ -208,12 +223,20 @@
   // --- Modal ---
   const cerrarSheet=()=>{ sheet.classList.remove('flex'); sheet.classList.add('hidden'); };
 
+  // Un pedido es "otro" si tiene el campo Producto cargado (las poleras no usan este campo)
+  const esPedidoOtro=p=>!!p.producto;
+
   const abrirModal=(id=null)=>{
     editId=id; errorMsg.classList.add('hidden'); stockIndicator.classList.add('hidden');
     if(id){
       modalTitle.textContent="Editar pedido";
       const p=pedidos.find(x=>x.id===id);
-      pasteBox.value=`Nombre: ${p.cliente}\nTeléfono: ${p.telefono||''}\nDirección: ${p.direccion||''}\nColor: ${p.color||''}\nTalla: ${p.talla||''}`;
+      setTipoPedido(esPedidoOtro(p)?'otro':'polera');
+      if(tipoPedidoActual==='otro'){
+        pasteBox.value=`Nombre: ${p.cliente}\nTeléfono: ${p.telefono||''}\nDirección: ${p.direccion||''}\nProducto: ${p.producto||''}`;
+      } else {
+        pasteBox.value=`Nombre: ${p.cliente}\nTeléfono: ${p.telefono||''}\nDirección: ${p.direccion||''}\nColor: ${p.color||''}\nTalla: ${p.talla||''}`;
+      }
       montoTotal.value=p.montoTotal; montoAbonado.value=p.montoAbonado;
       const dep=Number(p.despacho)||0;
       if(dep>0){ setModoEnvio('despacho'); montoDespacho.value=dep; }
@@ -221,6 +244,7 @@
     } else {
       modalTitle.textContent="Nuevo pedido";
       pasteBox.value=montoTotal.value=montoAbonado.value='';
+      setTipoPedido('polera');
       setModoEnvio('retiro');
     }
     actualizarPreview();
@@ -229,6 +253,25 @@
   };
 
   $('btnNuevo').addEventListener('click',()=>abrirModal(null));
+
+  // Toggle Polera / Otros
+  function setTipoPedido(tipo){
+    tipoPedidoActual=tipo;
+    const esOtro=tipo==='otro';
+    toggleTipoPolera.classList.toggle('bg-[#E8E8E8]',!esOtro);
+    toggleTipoPolera.classList.toggle('text-[#0A0A0A]',!esOtro);
+    toggleTipoPolera.classList.toggle('text-[#5A5A5A]',esOtro);
+    toggleTipoOtro.classList.toggle('bg-[#E8E8E8]',esOtro);
+    toggleTipoOtro.classList.toggle('text-[#0A0A0A]',esOtro);
+    toggleTipoOtro.classList.toggle('text-[#5A5A5A]',!esOtro);
+    if(labelMontoTotal) labelMontoTotal.textContent=esOtro?'Total producto':'Total poleras';
+    if(pasteBox) pasteBox.placeholder=esOtro
+      ?'Juan Pérez\n+56912345678\nAv. Pajaritos 1234\nProducto: Llavero acrílico'
+      :'Juan Pérez\n+56912345678\nAv. Pajaritos 1234\nPolera: Negro XL';
+    actualizarPreview();
+  }
+  toggleTipoPolera.addEventListener('click',()=>setTipoPedido('polera'));
+  toggleTipoOtro.addEventListener('click',()=>setTipoPedido('otro'));
 
   // Toggle Retiro / Despacho
   function setModoEnvio(modo){
@@ -246,7 +289,9 @@
   toggleRetiro.addEventListener('click',()=>setModoEnvio('retiro'));
   toggleDespacho.addEventListener('click',()=>setModoEnvio('despacho'));
   $('btnPlantilla').addEventListener('click',()=>{
-    pasteBox.value='Nombre: \nTeléfono: \nDirección: \nColor: \nTalla: ';
+    pasteBox.value=tipoPedidoActual==='otro'
+      ?'Nombre: \nTeléfono: \nDirección: \nProducto: '
+      :'Nombre: \nTeléfono: \nDirección: \nColor: \nTalla: ';
     pasteBox.focus();
     // mover cursor al final de "Nombre: "
     const pos=pasteBox.value.indexOf('\n'); pasteBox.setSelectionRange(pos,pos);
@@ -264,10 +309,20 @@
       errorMsg.textContent=!c.cliente?'No se detectó el nombre del cliente.':'Ingresa el monto total.';
       errorMsg.classList.remove('hidden'); return;
     }
+    if(tipoPedidoActual==='otro'&&!c.producto){
+      errorMsg.textContent='No se detectó el nombre del producto.';
+      errorMsg.classList.remove('hidden'); return;
+    }
     btnGuardar.disabled=true; btnGuardar.textContent='Guardando...';
     const despacho=parseFloat(montoDespacho?.value)||0;
+    // En categoría "Otros": color/talla van vacíos (no se usa Stock) y el nombre del producto
+    // se manda en su propio campo "producto", que el backend guarda en su propia columna.
+    // Al no cruzar con Stock, el backend lo deja automáticamente como "sin stock" (= no se
+    // descuenta nada del taller, y al entregarlo se suma igual a la caja como cualquier pedido).
+    const esOtro=tipoPedidoActual==='otro';
     const payload={cliente:c.cliente,telefono:c.telefono,direccion:c.direccion,
-      color:c.color,talla:c.talla,montoTotal:total,montoAbonado:abonado,despacho:despacho,porPagar:total+despacho-abonado};
+      color:esOtro?'':c.color, talla:esOtro?'':c.talla, producto:esOtro?c.producto:'',
+      montoTotal:total,montoAbonado:abonado,despacho:despacho,porPagar:total+despacho-abonado};
     try{
       if(editId){
         await api('update',{id:editId,...payload});
@@ -275,7 +330,7 @@
       } else {
         payload.fecha=new Date().toISOString(); payload.estado='Pendiente';
         const r=await api('create',{pedido:payload});
-        showToast(r&&r.sinStock?'⚠️ Guardado · Sin stock disponible':'Pedido guardado ✓');
+        showToast(r&&r.sinStock&&tipoPedidoActual==='polera'?'⚠️ Guardado · Sin stock disponible':'Pedido guardado ✓');
       }
       setOnline(true); cerrarSheet(); await cargar(false);
     }catch(e){
@@ -360,10 +415,10 @@
   }
 
   function cartaPedido(p){
-    const debe=p.porPagar>0, sinStock=calcSinStock(p);
-    return`<div class="bg-[#141414] border ${sinStock?'border-amber-800/50':'border-[#2A2A2A]'} rounded-xl relative overflow-hidden flex flex-col hover:border-[#5A5A5A] transition-colors">
-      <div class="absolute top-0 left-0 bottom-0 w-[3px] ${sinStock?'bg-amber-500':debe?'bg-red-600':'bg-emerald-600'}"></div>
-      ${sinStock?`<div class="bg-amber-950/30 border-b border-amber-800/30 px-4 py-2 flex items-center gap-2"><span>⚠️</span><span class="text-[10px] font-bold uppercase tracking-widest text-amber-400">Por Comprar · Falta Stock</span></div>`:''}
+    const debe=p.porPagar>0, sinStock=calcSinStock(p), esOtro=esPedidoOtro(p);
+    return`<div class="bg-[#141414] border ${sinStock&&!esOtro?'border-amber-800/50':'border-[#2A2A2A]'} rounded-xl relative overflow-hidden flex flex-col hover:border-[#5A5A5A] transition-colors">
+      <div class="absolute top-0 left-0 bottom-0 w-[3px] ${sinStock&&!esOtro?'bg-amber-500':debe?'bg-red-600':'bg-emerald-600'}"></div>
+      ${sinStock&&!esOtro?`<div class="bg-amber-950/30 border-b border-amber-800/30 px-4 py-2 flex items-center gap-2"><span>⚠️</span><span class="text-[10px] font-bold uppercase tracking-widest text-amber-400">Por Comprar · Falta Stock</span></div>`:''}
       <div class="p-5 pl-6 flex-1 flex flex-col">
         <div class="flex justify-between items-start mb-2">
           <div>
@@ -374,12 +429,14 @@
           <div class="text-[10px] text-[#5A5A5A] text-right whitespace-nowrap">${fechaCorta(p.fecha)}</div>
         </div>
         <div class="flex flex-wrap gap-1.5 my-3">
-          ${(p.color||p.talla)?`<span class="text-xs px-3 py-1.5 rounded-md border font-medium tracking-wide ${sinStock?'bg-amber-950/20 border-amber-800/40 text-amber-300':'bg-[#1C1C1C] border-[#2A2A2A] text-[#E8E8E8]'}">👕 Polera ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</span>`:''}
+          ${esOtro
+            ?`<span class="text-xs px-3 py-1.5 rounded-md border font-medium tracking-wide bg-[#1C1C1C] border-[#2A2A2A] text-[#E8E8E8]">🎁 ${esc(cap(p.producto))}</span>`
+            :(p.color||p.talla)?`<span class="text-xs px-3 py-1.5 rounded-md border font-medium tracking-wide ${sinStock?'bg-amber-950/20 border-amber-800/40 text-amber-300':'bg-[#1C1C1C] border-[#2A2A2A] text-[#E8E8E8]'}">👕 Polera ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</span>`:''}
         </div>
         ${p.direccion?`<a href="https://maps.google.com/?q=${encodeURIComponent(p.direccion)}" target="_blank" rel="noopener" class="text-[12.5px] text-[#9C9C9C] my-2 flex gap-2 items-start bg-[#1C1C1C] p-2.5 rounded-lg border border-[#2A2A2A]/50 hover:border-[#5A5A5A] hover:text-[#E8E8E8] transition-colors active:scale-[0.99]"><span>📍</span><span class="flex-1">${esc(p.direccion)}</span><span class="text-[10px] text-blue-400 self-center whitespace-nowrap">Ver mapa ›</span></a>`:''}
         <div class="mt-auto pt-4 border-t border-[#2A2A2A]">
           <div class="flex gap-3 text-[11px] text-[#5A5A5A] mb-3">
-            <div>Poleras<b class="block text-[13px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoTotal)}</b></div>
+            <div>${esOtro?'Producto':'Poleras'}<b class="block text-[13px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoTotal)}</b></div>
             ${Number(p.despacho)>0?`<div>Despacho<b class="block text-[13px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.despacho)}</b></div>`:'<div>🏠 Retiro<b class="block text-[13px] text-[#9C9C9C] font-mono font-normal mt-0.5">—</b></div>'}
             <div>Abono<b class="block text-[13px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoAbonado)}</b></div>
           </div>
@@ -440,23 +497,28 @@
 
   function renderHistorial(){
     const b=getMonthBounds(historialMonthOffset);
-    const ents=pedidos.filter(p=>p.estado==='Entregado'&&new Date(p.fecha)>=b.start&&new Date(p.fecha)<b.end)
+    const entsTodos=pedidos.filter(p=>p.estado==='Entregado'&&new Date(p.fecha)>=b.start&&new Date(p.fecha)<b.end)
       .sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
-    const totalMes=ents.reduce((s,p)=>s+p.montoTotal,0);
+    const totalMes=entsTodos.reduce((s,p)=>s+p.montoTotal,0);
+    const LIMITE_HISTORIAL=10;
+    const ents=entsTodos.slice(0,LIMITE_HISTORIAL);
     const itemHtml=p=>{
       const deuda=Number(p.porPagar)||0;
       const desp=Number(p.despacho)||0;
+      const esOtro=esPedidoOtro(p);
       return`<div class="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 mb-3 hover:border-[#5A5A5A] transition-colors">
         <div class="flex justify-between items-start mb-2">
           <div>
             <div class="font-semibold text-[15px] text-[#E8E8E8]">${esc(p.cliente)}</div>
             <div class="text-[11px] text-[#5A5A5A] mt-1">N° ${String(p.id).padStart(3,'0')} · ${fechaCorta(p.fecha)}</div>
-            ${(p.color||p.talla)?`<div class="text-[11px] text-[#5A5A5A] mt-1">👕 ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</div>`:''}
+            ${esOtro
+              ?`<div class="text-[11px] text-[#5A5A5A] mt-1">🎁 ${esc(cap(p.producto))}</div>`
+              :(p.color||p.talla)?`<div class="text-[11px] text-[#5A5A5A] mt-1">👕 ${p.color?esc(cap(p.color)):''}${p.talla?` · Talla ${esc(p.talla)}`:''}</div>`:''}
           </div>
           <span class="text-[9px] uppercase tracking-widest font-bold text-emerald-400 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-900/40 shrink-0">Entregado</span>
         </div>
         <div class="flex gap-3 text-[11px] text-[#5A5A5A] pt-2 border-t border-[#2A2A2A]/50 mt-2">
-          <div>Poleras<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoTotal)}</b></div>
+          <div>${esOtro?'Producto':'Poleras'}<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoTotal)}</b></div>
           ${desp>0?`<div>Despacho<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(desp)}</b></div>`:''}
           <div>Abono<b class="block text-[12px] text-[#E8E8E8] font-mono font-normal mt-0.5">${fmt(p.montoAbonado)}</b></div>
           <div class="ml-auto text-right">
@@ -472,7 +534,7 @@
       <div class="font-display text-xl font-semibold text-[#E8E8E8] capitalize">${MESES[b.month]} ${b.year}</div>
       <button id="nextMonth" class="w-10 h-10 rounded-full hover:bg-[#2A2A2A] text-[#9C9C9C] flex items-center justify-center text-lg disabled:opacity-30" ${historialMonthOffset===0?'disabled':''}>›</button>
     </div>
-    ${ents.length?`<div class="text-xs tracking-[0.12em] uppercase text-[#5A5A5A] my-4 flex items-center gap-2 after:content-[''] after:flex-1 after:h-[1px] after:bg-[#2A2A2A]">${ents.length} entregados · ${fmt(totalMes)}</div>`:''}
+    ${entsTodos.length?`<div class="text-xs tracking-[0.12em] uppercase text-[#5A5A5A] my-4 flex items-center gap-2 after:content-[''] after:flex-1 after:h-[1px] after:bg-[#2A2A2A]">${entsTodos.length} entregados · ${fmt(totalMes)}${entsTodos.length>LIMITE_HISTORIAL?` · mostrando últimos ${LIMITE_HISTORIAL}`:''}</div>`:''}
     <div class="relative mb-5">
       <span class="absolute left-4 top-1/2 -translate-y-1/2 opacity-50 text-sm">🔎</span>
       <input type="text" id="buscadorInput" class="w-full py-3.5 pl-10 pr-4 rounded-xl border border-[#2A2A2A] bg-[#141414] text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="Buscar en el historial...">
@@ -482,9 +544,11 @@
       main.innerHTML=html+`<div class="text-center py-20 text-[#5A5A5A]"><div class="w-10 h-10 mx-auto mb-4 opacity-30">${STAR}</div><p class="text-base text-[#9C9C9C] font-semibold">Sin entregas este mes.</p></div>`;
     } else {
       main.innerHTML=html+`<div id="histList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">${ents.map(itemHtml).join('')}</div>`;
+      // El buscador filtra sobre TODO el mes (no solo los últimos 10), para no esconder resultados al buscar.
       $('buscadorInput')?.addEventListener('input',e=>{
         const q=e.target.value.trim().toLowerCase();
-        const f=ents.filter(p=>p.cliente.toLowerCase().includes(q)||String(p.id).includes(q));
+        const baseFiltro=q?entsTodos:ents;
+        const f=baseFiltro.filter(p=>p.cliente.toLowerCase().includes(q)||String(p.id).includes(q));
         $('histList').innerHTML=f.length?f.map(itemHtml).join(''):`<div class="col-span-full text-center py-8 text-sm text-[#5A5A5A]">Sin resultados.</div>`;
       });
     }
@@ -593,12 +657,18 @@
 
   function calcFinanzas(rango){
     const gastos=finanzas.filter(f=>f.tipo==='gasto'&&new Date(f.fecha)>=rango.start&&new Date(f.fecha)<rango.end);
-    const poleras=gastos.filter(f=>f.categoria==='poleras').reduce((s,f)=>s+f.monto,0);
-    const dtf=gastos.filter(f=>f.categoria==='dtf').reduce((s,f)=>s+f.monto,0);
+    // Desglose informativo: se reconoce "poleras"/"dtf" si el texto del gasto las menciona;
+    // todo lo demás (texto libre del usuario) cae en "otros". El total invertido SIEMPRE
+    // es la suma real de todos los gastos, sin depender de que el texto calce con una palabra.
+    const esCat=(f,kw)=>norm(f.categoria).includes(kw);
+    const poleras=gastos.filter(f=>esCat(f,'polera')).reduce((s,f)=>s+f.monto,0);
+    const dtf=gastos.filter(f=>esCat(f,'dtf')).reduce((s,f)=>s+f.monto,0);
+    const totalGasto=gastos.reduce((s,f)=>s+f.monto,0);
+    const otros=totalGasto-poleras-dtf;
     // Ingresos desde pedidos (montoAbonado si pendiente, montoTotal si entregado)
     const ingresos=pedidos.filter(p=>new Date(p.fecha)>=rango.start&&new Date(p.fecha)<rango.end)
       .reduce((s,p)=>s+(p.estado==='Entregado'?p.montoTotal:p.montoAbonado),0);
-    return{poleras,dtf,totalGasto:poleras+dtf,ingresos,balance:ingresos-(poleras+dtf)};
+    return{poleras,dtf,otros,totalGasto,ingresos,balance:ingresos-totalGasto};
   }
 
   function renderFinanzas(){
@@ -633,11 +703,7 @@
       <!-- Semana -->
       ${separador('📅 Esta semana')}
       <div class="grid grid-cols-2 gap-3 mb-3">
-        ${tarjeta('Poleras 📉',s.poleras,'Inversión en prendas','text-red-400')}
-        ${tarjeta('DTF 📉',s.dtf,'Inversión en láminas','text-red-400')}
-      </div>
-      <div class="grid grid-cols-2 gap-3 mb-3">
-        ${tarjeta('Total Invertido',s.totalGasto,'Poleras + DTF',s.totalGasto>0?'text-red-400':'text-[#E8E8E8]')}
+        ${tarjeta('Total Invertido 📉',s.totalGasto,'Todos los gastos','text-red-400')}
         ${tarjeta('Ganado 📈',s.ingresos,'Ingresos de pedidos','text-emerald-400')}
       </div>
       <div class="bg-[#141414] border ${s.balance>=0?'border-emerald-900/30':'border-red-900/30'} rounded-xl p-4 mb-2">
@@ -649,11 +715,7 @@
       <!-- Mes -->
       ${separador('🗓️ Este mes · '+MESES[new Date().getMonth()])}
       <div class="grid grid-cols-2 gap-3 mb-3">
-        ${tarjeta('Poleras 📉',m.poleras,'Inversión en prendas','text-red-400')}
-        ${tarjeta('DTF 📉',m.dtf,'Inversión en láminas','text-red-400')}
-      </div>
-      <div class="grid grid-cols-2 gap-3 mb-3">
-        ${tarjeta('Total Invertido',m.totalGasto,'Poleras + DTF',m.totalGasto>0?'text-red-400':'text-[#E8E8E8]')}
+        ${tarjeta('Total Invertido 📉',m.totalGasto,'Todos los gastos','text-red-400')}
         ${tarjeta('Ganado 📈',m.ingresos,'Ingresos del mes','text-emerald-400')}
       </div>
       <div class="bg-[#141414] border ${m.balance>=0?'border-emerald-900/30':'border-red-900/30'} rounded-xl p-4 mb-5">
@@ -665,11 +727,9 @@
       <!-- Formulario registrar gasto -->
       ${separador('➕ Registrar gasto')}
       <div class="bg-[#141414] border border-[#2A2A2A] rounded-xl p-4 mb-4">
+        <input type="text" id="gastoNombre" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A] mb-3" placeholder="Nombre del gasto (ej: Tela poleras, Láminas DTF, Llaveros)">
         <input type="number" id="gastoMonto" class="w-full border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-3 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A] mb-3" placeholder="Monto del gasto (ej: 20000)" inputmode="numeric">
-        <div class="grid grid-cols-2 gap-2">
-          <button onclick="appRegistrarGasto('poleras')" class="py-3 rounded-lg bg-[#1C1C1C] border border-[#2A2A2A] text-xs font-bold uppercase tracking-wider text-[#9C9C9C] hover:bg-[#2A2A2A] hover:text-[#E8E8E8] transition-colors active:scale-95">− Gasto Poleras</button>
-          <button onclick="appRegistrarGasto('dtf')" class="py-3 rounded-lg bg-[#1C1C1C] border border-[#2A2A2A] text-xs font-bold uppercase tracking-wider text-[#9C9C9C] hover:bg-[#2A2A2A] hover:text-[#E8E8E8] transition-colors active:scale-95">− Gasto DTF</button>
-        </div>
+        <button onclick="appRegistrarGasto()" class="w-full py-3 rounded-lg bg-[#E8E8E8] text-[#0A0A0A] text-xs font-bold uppercase tracking-wider active:scale-[0.98] hover:bg-white transition-all">− Registrar gasto</button>
       </div>
 
       <!-- Historial de gastos recientes -->
@@ -682,7 +742,7 @@
               return `<div class="bg-[#141414] border border-[#2A2A2A] rounded-lg px-4 py-3">
                 <div class="flex justify-between items-center">
                   <div>
-                    <span class="text-[10px] uppercase tracking-wider font-bold ${f.categoria==='poleras'?'text-blue-400':'text-purple-400'}">${f.categoria==='poleras'?'👕 Poleras':'🖨 DTF'}</span>
+                    <span class="text-[10px] uppercase tracking-wider font-bold text-[#9C9C9C]">${esc(cap(f.categoria))||'Gasto'}</span>
                     <div class="text-[11px] text-[#5A5A5A] mt-0.5">${new Date(f.fecha).toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'2-digit'})}</div>
                   </div>
                   <div class="flex items-center gap-3">
@@ -692,11 +752,8 @@
                   </div>
                 </div>
                 <div id="editGasto_${idx}" class="hidden mt-3 pt-3 border-t border-[#2A2A2A] flex gap-2">
-                  <input type="number" id="editGastoMonto_${idx}" value="${f.monto}" class="flex-1 border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-2 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" inputmode="numeric">
-                  <select id="editGastoCat_${idx}" class="border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-2 text-xs text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]">
-                    <option value="poleras" ${f.categoria==='poleras'?'selected':''}>👕 Poleras</option>
-                    <option value="dtf" ${f.categoria==='dtf'?'selected':''}>🖨 DTF</option>
-                  </select>
+                  <input type="text" id="editGastoNombre_${idx}" value="${esc(f.categoria)}" class="flex-1 border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-2 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" placeholder="Nombre del gasto">
+                  <input type="number" id="editGastoMonto_${idx}" value="${f.monto}" class="w-28 border border-[#2A2A2A] bg-[#1C1C1C] rounded-lg p-2 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#5A5A5A]" inputmode="numeric">
                   <button onclick="appGuardarEdicionGasto(${idx})" class="px-3 py-2 rounded-lg bg-[#E8E8E8] text-[#0A0A0A] text-xs font-bold">✓</button>
                 </div>
               </div>`;
@@ -707,9 +764,11 @@
     main.innerHTML=html;
   }
 
-  window.appRegistrarGasto=async(categoria)=>{
-    const input=$('gastoMonto');
-    const monto=parseFloat(input?.value);
+  window.appRegistrarGasto=async()=>{
+    const inputNombre=$('gastoNombre'), inputMonto=$('gastoMonto');
+    const categoria=(inputNombre?.value||'').trim();
+    const monto=parseFloat(inputMonto?.value);
+    if(!categoria){ showToast('Escribe el nombre del gasto'); return; }
     if(!monto||monto<=0){ showToast('Ingresa un monto válido'); return; }
     const gasto={fecha:new Date().toISOString(),tipo:'gasto',categoria,monto};
     finanzas.push(gasto);
@@ -717,7 +776,7 @@
     try{
       await api('registrarGasto',{gasto});
       setOnline(true);
-      showToast(`Gasto ${categoria==='poleras'?'Poleras':'DTF'} registrado ✓`);
+      showToast(`Gasto "${categoria}" registrado ✓`);
     }catch(e){
       finanzas.pop();
       setOnline(false);
@@ -733,8 +792,9 @@
   };
 
   window.appGuardarEdicionGasto=async idx=>{
+    const cat=($(`editGastoNombre_${idx}`)?.value||'').trim();
     const monto=parseFloat($(`editGastoMonto_${idx}`)?.value);
-    const cat=$(`editGastoCat_${idx}`)?.value;
+    if(!cat){ showToast('Escribe el nombre del gasto'); return; }
     if(!monto||monto<=0){ showToast('Monto inválido'); return; }
     const anterior={...finanzas[idx]};
     finanzas[idx]={...finanzas[idx],monto,categoria:cat};
